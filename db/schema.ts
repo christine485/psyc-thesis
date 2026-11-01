@@ -1,0 +1,2 @@
+import {sqliteTable,text,integer,primaryKey,uniqueIndex} from 'drizzle-orm/sqlite-core';
+export const slots=sqliteTable('slots',{mode:text('mode').notNull(),id:integer('id').notNull(),tokenHash:text('token_hash'),expires:integer('expires').notNull().default(0),plan:text('plan'),submitted:integer('submitted').notNull().default(0),payload:text('payload')},t=>[primaryKey({columns:[t.mode,t.id]}),uniqueIndex('session_token').on(t.tokenHash)]);

@@ -1,0 +1,1 @@
+import {redirect} from 'next/navigation';export default async function Home({searchParams}:{searchParams:Promise<{mode?:string}>}){const p=await searchParams;redirect('/experiment/index.html'+(p.mode==='pilot'?'?mode=pilot':''));}

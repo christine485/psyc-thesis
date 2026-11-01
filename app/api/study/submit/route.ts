@@ -1,0 +1,1 @@
+import {submit,json,readBody,options} from '../../../../lib/server';export const OPTIONS=options;export async function POST(req:Request){try{return json(req,await submit(await readBody(req)));}catch(e){return json(req,{error:e instanceof Error?e.message:'暫時未能提交，請稍後再試。'},400);}}

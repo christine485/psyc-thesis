@@ -1,0 +1,1 @@
+import {PROTOCOL,STIMULI} from '../../../docs/modules/protocol.mjs';export async function GET(){return Response.json({ok:true,protocol:PROTOCOL,images:STIMULI.length},{headers:{'Cache-Control':'no-store'}});}

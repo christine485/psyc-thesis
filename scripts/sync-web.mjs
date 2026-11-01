@@ -1,0 +1,1 @@
+import fs from 'node:fs';fs.mkdirSync('public/experiment',{recursive:true});fs.cpSync('docs','public/experiment',{recursive:true});console.log('Participant frontend synchronized.');
