@@ -4,7 +4,7 @@ import {makePlan,validateSubmission,PROTOCOL,CONSENT,STIMULI,FAMILIES,normalizeP
 export function bindings(){return env as unknown as {DB:D1Database;BUCKET:R2Bucket;ADMIN_EMAIL?:string;DRAW_SECRET?:string};}
 export const mode=(x:unknown)=>x==='pilot'?'pilot':'live';
 export const storageMode=(x:unknown)=>mode(x)+':'+PROTOCOL;
-const siteOrigin='https://cloud-flow-emotion-study.copperrose2.chatgpt.site';
+const siteOrigin='https://cloud-flow-emotion-study.christine040805.chatgpt.site';
 export function allowedOrigin(req:Request){const origin=req.headers.get('origin');return origin===new URL(req.url).origin||origin===siteOrigin||origin==='https://christine485.github.io'||/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin||'');}
 export function cors(req:Request){const h:Record<string,string>={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Vary':'Origin'};if(allowedOrigin(req)){h['Access-Control-Allow-Origin']=req.headers.get('origin')||new URL(req.url).origin;h['Access-Control-Allow-Methods']='POST, OPTIONS';h['Access-Control-Allow-Headers']='Content-Type';}return h;}
 export function json(req:Request,value:unknown,status=200){return Response.json(value,{status,headers:cors(req)});}
