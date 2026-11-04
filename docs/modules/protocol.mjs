@@ -1,6 +1,6 @@
-import {FAMILIES} from './bank.mjs';import {STIMULI} from './stimuli.mjs';
-export {FAMILIES,STIMULI};
-export const PROTOCOL='cloud-flow-naming-fit-v1',CONSENT='cloud-flow-consent-20261101-v1',CLASSIFIER='tc-lexicon-conservative-v1',TOTAL=28;
+import {FAMILIES,PILOT} from './bank.mjs';import {STIMULI} from './stimuli.mjs';
+export {FAMILIES,STIMULI,PILOT};
+export const PROTOCOL='cloud-flow-naming-fit-v2-pilot20261104',CONSENT='cloud-flow-consent-20261101-v1',CLASSIFIER='tc-lexicon-conservative-v1',TOTAL=28;
 export const EDUCATION=['幼稚園','小學','初中','高中','文憑／高級文憑／副學士','學士','研究生（碩士／博士）'];
 export const SCALE=['完全不配合','稍微配合','中等程度配合','頗為配合','非常配合'];
 export function rng(seed){let x=2166136261;for(const c of String(seed))x=Math.imul(x^c.charCodeAt(0),16777619);return()=>{x+=0x6D2B79F5;let t=Math.imul(x^x>>>15,1|x);t^=t+Math.imul(t^t>>>7,61|t);return((t^t>>>14)>>>0)/4294967296;};}

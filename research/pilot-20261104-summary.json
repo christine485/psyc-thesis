@@ -1,0 +1,304 @@
+{
+  "analysis_date": "2026-11-04",
+  "source_name": "Emotional Words_November 4, 2026_07.26.csv",
+  "source_sha256": "f4474dc5b0f0ab2263bf1c09303d8c6e5c9bc6d62b86185010a70d880b5302df",
+  "total": 112,
+  "included": 100,
+  "excluded_incomplete": 12,
+  "complete_ratings": 10000,
+  "missing_complete": 0,
+  "constant_complete": 64,
+  "nonconstant_complete": 36,
+  "duplicate_response_ids": 0,
+  "duplicate_vector_groups": [
+    14,
+    17,
+    13,
+    14,
+    6
+  ],
+  "complete_duration_42s": 58,
+  "constant_score_sum": 205,
+  "duration_median_s": 42.0,
+  "duration_min_s": 33.0,
+  "duration_max_s": 53431.0,
+  "over30min_n": 4,
+  "old_complete_overlap": 21,
+  "new_complete_since_old": 79,
+  "selection_rule": "Top three by unrounded mean within original family; no frequency threshold; preserve previously selected words on exact boundary ties, then ID.",
+  "primary_rule": "User requested retaining every complete questionnaire, including constant and fast responses.",
+  "bootstrap_samples": 5000,
+  "bootstrap_seed": 20261104,
+  "families": [
+    {
+      "family": "HAP",
+      "label": "快樂",
+      "previous": [
+        "開心",
+        "幸福",
+        "興奮"
+      ],
+      "selected": [
+        "開心",
+        "幸福",
+        "興奮"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "開心",
+        "幸福",
+        "興奮"
+      ],
+      "duration_le30min_top3": [
+        "開心",
+        "幸福",
+        "興奮"
+      ],
+      "words_ge60pct": 5
+    },
+    {
+      "family": "ANG",
+      "label": "憤怒",
+      "previous": [
+        "煩躁",
+        "不滿",
+        "生氣"
+      ],
+      "selected": [
+        "不滿",
+        "煩躁",
+        "生氣"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "不滿",
+        "煩躁",
+        "生氣"
+      ],
+      "duration_le30min_top3": [
+        "不滿",
+        "煩躁",
+        "生氣"
+      ],
+      "words_ge60pct": 4
+    },
+    {
+      "family": "SAD",
+      "label": "悲傷",
+      "previous": [
+        "傷心",
+        "心酸",
+        "心痛"
+      ],
+      "selected": [
+        "傷心",
+        "心痛",
+        "心酸"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "傷心",
+        "心痛",
+        "心酸"
+      ],
+      "duration_le30min_top3": [
+        "傷心",
+        "心痛",
+        "心酸"
+      ],
+      "words_ge60pct": 9
+    },
+    {
+      "family": "FEA",
+      "label": "恐懼",
+      "previous": [
+        "害怕",
+        "恐懼",
+        "驚慌"
+      ],
+      "selected": [
+        "害怕",
+        "驚慌",
+        "驚嚇"
+      ],
+      "changed": true,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "害怕",
+        "驚慌",
+        "驚嚇"
+      ],
+      "duration_le30min_top3": [
+        "害怕",
+        "驚慌",
+        "驚嚇"
+      ],
+      "words_ge60pct": 6
+    },
+    {
+      "family": "DIS",
+      "label": "厭惡",
+      "previous": [
+        "討厭",
+        "反感",
+        "噁心"
+      ],
+      "selected": [
+        "討厭",
+        "反感",
+        "嫌棄"
+      ],
+      "changed": true,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "討厭",
+        "反感",
+        "嫌棄"
+      ],
+      "duration_le30min_top3": [
+        "討厭",
+        "反感",
+        "嫌棄"
+      ],
+      "words_ge60pct": 8
+    },
+    {
+      "family": "ANX",
+      "label": "焦慮",
+      "previous": [
+        "擔心",
+        "焦慮",
+        "緊張"
+      ],
+      "selected": [
+        "緊張",
+        "焦慮",
+        "擔心"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "緊張",
+        "焦慮",
+        "擔心"
+      ],
+      "duration_le30min_top3": [
+        "緊張",
+        "焦慮",
+        "擔心"
+      ],
+      "words_ge60pct": 9
+    },
+    {
+      "family": "SUR",
+      "label": "驚訝",
+      "previous": [
+        "驚訝",
+        "意外",
+        "震驚"
+      ],
+      "selected": [
+        "意外",
+        "驚訝",
+        "震驚"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "意外",
+        "驚訝",
+        "震驚"
+      ],
+      "duration_le30min_top3": [
+        "意外",
+        "驚訝",
+        "震驚"
+      ],
+      "words_ge60pct": 6
+    },
+    {
+      "family": "CON",
+      "label": "滿足",
+      "previous": [
+        "滿足",
+        "滿意",
+        "慶幸"
+      ],
+      "selected": [
+        "滿足",
+        "滿意",
+        "充實"
+      ],
+      "changed": true,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "滿足",
+        "滿意",
+        "充實"
+      ],
+      "duration_le30min_top3": [
+        "滿足",
+        "滿意",
+        "充實"
+      ],
+      "words_ge60pct": 8
+    },
+    {
+      "family": "AMU",
+      "label": "愉快",
+      "previous": [
+        "愉快",
+        "暢快",
+        "愉悅"
+      ],
+      "selected": [
+        "愉快",
+        "暢快",
+        "歡樂"
+      ],
+      "changed": true,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "愉快",
+        "暢快",
+        "歡樂"
+      ],
+      "duration_le30min_top3": [
+        "愉快",
+        "暢快",
+        "歡樂"
+      ],
+      "words_ge60pct": 2
+    },
+    {
+      "family": "SER",
+      "label": "平靜",
+      "previous": [
+        "輕鬆",
+        "舒服",
+        "放鬆"
+      ],
+      "selected": [
+        "舒服",
+        "輕鬆",
+        "放鬆"
+      ],
+      "changed": false,
+      "cutoff_tie": [],
+      "nonconstant_top3": [
+        "舒服",
+        "輕鬆",
+        "放鬆"
+      ],
+      "duration_le30min_top3": [
+        "舒服",
+        "放鬆",
+        "輕鬆"
+      ],
+      "words_ge60pct": 9
+    }
+  ]
+}
