@@ -1,1 +1,1 @@
-import {redirect} from 'next/navigation';export default async function Home({searchParams}:{searchParams:Promise<{mode?:string}>}){const p=await searchParams;redirect('/experiment/index.html'+(p.mode==='pilot'?'?mode=pilot':''));}
+import {redirect} from 'next/navigation';export default async function Home({searchParams}:{searchParams:Promise<{mode?:string;preview?:string}>}){const p=await searchParams;const query=new URLSearchParams({mode:p.mode==='live'?'live':'pilot'});if(p.preview==='1')query.set('preview','1');redirect('/experiment/index.html?'+query);}

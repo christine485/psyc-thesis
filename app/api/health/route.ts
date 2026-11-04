@@ -1,1 +1,1 @@
-import {PROTOCOL,STIMULI} from '../../../docs/modules/protocol.mjs';export async function GET(){return Response.json({ok:true,protocol:PROTOCOL,images:STIMULI.length},{headers:{'Cache-Control':'no-store'}});}
+import {PROTOCOL,STIMULI,PILOT} from '../../../docs/modules/protocol.mjs';import {bindings} from '../../../lib/server';export async function GET(){const b=bindings();return Response.json({ok:true,protocol:PROTOCOL,images:STIMULI.length,pilotVersion:PILOT.version,configurationReady:!!(b.ADMIN_EMAIL&&b.DRAW_SECRET)},{headers:{'Cache-Control':'no-store'}});}
