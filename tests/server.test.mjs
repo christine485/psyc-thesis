@@ -11,6 +11,8 @@ source=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,t
 const server=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const uid=()=>crypto.randomUUID();
 function bodyFor(plan,token,valid=true){return {token,drawNonce:uid(),mode:'pilot',protocol:PROTOCOL,consent:CONSENT,consented:true,demographics:{gender:'女',age:23,education:'學士'},device:{kind:'手機',viewportWidth:390,viewportHeight:844},responses:plan.trials.map((t,i)=>{const freeText=t.type==='attention'?(valid?'2':'1'):i%3===0?'沒有感覺':i%3===1?'開心、緊張':'唔開心';return {type:t.type,stimulus:t.stimulus,freeText,ratings:Object.fromEntries(ratingWords(freeText,t,plan.rowSeed).map(w=>[w,t.type==='attention'?2:4])),durationMs:8000,namingMs:3000,width:310,height:310};})};}
+
+test('valid draw permit cannot register an overseas number',async()=>{const permit=await server.signPermit(uid(),'pilot');const before=objects.size;await assert.rejects(()=>server.enterDraw({mode:'pilot',permit,phone:'+447700900123'}),/香港電話/);assert.equal(objects.size,before);});
 test('real schema: ten allocations balanced, reclaimed expired slot reused',async()=>{
  const plans=[];for(let i=0;i<10;i++)plans.push(await server.allocate({token:uid(),mode:'pilot',protocol:PROTOCOL,consent:CONSENT,consented:true}));
  assert.equal(new Set(plans.flatMap(p=>p.trials.filter(t=>t.type==='main').map(t=>t.stimulus))).size,270);

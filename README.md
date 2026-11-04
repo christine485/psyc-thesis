@@ -1,11 +1,11 @@
 # A Lexicon Without Objects
 繁體中文抽象圖像與情緒詞語研究。
 
-網站入口：[開始試測](https://cloud-flow-emotion-study.christine040805.chatgpt.site/?mode=pilot)。
+網站入口：[開始正式實驗](https://cloud-flow-emotion-study.christine040805.chatgpt.site/?mode=live)。
 研究人員：[查看試測資料](https://cloud-flow-emotion-study.christine040805.chatgpt.site/researcher?mode=pilot)，需以網站擁有者帳戶登入。
 
 ## 狀態
-已獲公開刺激材料授權，網站預設為試測模式；裝置與香港網絡仍需實測。請先使用試測模式，勿將「15分鐘目標」或圖片覆蓋數當作已驗證的統計檢定力。
+已獲公開刺激材料授權，網站預設為正式研究模式；裝置與香港網絡仍需實測。請先使用試測模式，勿將「15分鐘目標」或圖片覆蓋數當作已驗證的統計檢定力。
 
 ## 參加流程
 同意書 → 27張主圖與1次注意力測試 → 背景資料 → 研究解說 → 提交及自願抽獎。

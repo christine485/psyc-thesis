@@ -51,7 +51,7 @@ export async function submit(body:any){
 }
 export async function enterDraw(body:any){
  const m=mode(body.mode),nonce=await verifyPermit(body.permit,m),phone=normalizePhone(body.phone);
- if(!nonce)throw Error('未能確認有效問卷的抽獎資格。');if(!phone)throw Error('請輸入8位香港電話，或以＋國際區號開頭的電話。');
+ if(!nonce)throw Error('未能確認有效問卷的抽獎資格。');if(!phone)throw Error('抽獎只接受香港電話號碼，請輸入8位數字或＋852及8位數字。');
  const phoneHash=await hash(phone),bucket=bindings().BUCKET,claimKey=m+'/permits/'+await hash(nonce)+'.json';
  const claim=await bucket.put(claimKey,JSON.stringify({phoneHash}),{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/json'}});
  if(!claim){const existing:any=await (await bucket.get(claimKey))?.json();if(existing?.phoneHash!==phoneHash)throw Error('這個抽獎資格已使用。');}

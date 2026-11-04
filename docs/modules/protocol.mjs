@@ -1,6 +1,6 @@
 import {FAMILIES,PILOT} from './bank.mjs';import {STIMULI} from './stimuli.mjs';
 export {FAMILIES,STIMULI,PILOT};
-export const PROTOCOL='cloud-flow-naming-fit-v2-pilot20261104',CONSENT='cloud-flow-consent-20261101-v1',CLASSIFIER='tc-lexicon-conservative-v1',TOTAL=28;
+export const PROTOCOL='cloud-flow-naming-fit-v3-hk20261104',CONSENT='cloud-flow-consent-20261104-v2-hk',CLASSIFIER='tc-lexicon-conservative-v1',TOTAL=28;
 export const EDUCATION=['幼稚園','小學','初中','高中','文憑／高級文憑／副學士','學士','研究生（碩士／博士）'];
 export const SCALE=['完全不配合','稍微配合','中等程度配合','頗為配合','非常配合'];
 export function rng(seed){let x=2166136261;for(const c of String(seed))x=Math.imul(x^c.charCodeAt(0),16777619);return()=>{x+=0x6D2B79F5;let t=Math.imul(x^x>>>15,1|x);t^=t+Math.imul(t^t>>>7,61|t);return((t^t>>>14)>>>0)/4294967296;};}
@@ -36,7 +36,7 @@ export function classifyWord(raw){
 }
 export function classify(raw){return parseWords(raw).map(classifyWord);}
 export function ratingWords(raw,trial,seed){if(trial.type==='attention')return [...trial.words];const groups=[...new Set(classify(raw).map(x=>x.family).filter(Boolean))];return shuffle(groups.flatMap(id=>FAMILIES.find(f=>f.id===id).selected),rng(seed+':'+trial.stimulus+':rows'));}
-export function normalizePhone(value){const s=String(value??'').normalize('NFKC').replace(/[\s().-]/g,'');if(/^\+\d{7,15}$/.test(s))return s;if(/^[2-9]\d{7}$/.test(s))return '+852'+s;return null;}
+export function normalizePhone(value){const s=String(value??'').normalize('NFKC').replace(/[\s().-]/g,'');const match=s.match(/^(?:\+?852)?([2-9]\d{7})$/);return match?'+852'+match[1]:null;}
 export function validateSubmission(body,plan,seed){
  if(body.protocol!==PROTOCOL||body.consent!==CONSENT||body.consented!==true)throw Error('同意紀錄或研究版本不正確。');
  const d=body.demographics;if(!d||!['男','女','其他'].includes(d.gender)||!Number.isInteger(d.age)||d.age<18||d.age>120||!EDUCATION.includes(d.education))throw Error('請完整填寫背景資料；參加者須年滿18歲。');

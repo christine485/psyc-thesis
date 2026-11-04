@@ -32,7 +32,7 @@ Email: [xiangbinteng@cuhk.edu.hk](mailto:xiangbinteng@cuhk.edu.hk)
 
 ## 酬謝與抽獎
 
-提交有效問卷的參加者可自願登記抽獎，共有20名得獎者，每人獲得港幣200元。「有效問卷」指完整提交所有必答題，並在注意力測試中輸入「2」及於全部評分選擇「2」。未通過者的研究答案仍會保留並作標記供分析，但不符合抽獎資格。參加抽獎並非研究的必要條件。
+提交有效問卷的參加者可自願登記抽獎，共有20名得獎者，每人獲得港幣200元。「有效問卷」指完整提交所有必答題，並在注意力測試中輸入「2」及於全部評分選擇「2」。未通過者的研究答案仍會保留並作標記供分析，但不符合抽獎資格。參加抽獎並非研究的必要條件。參加抽獎必須提供有效香港電話號碼。中獎後會以轉數快（FPS）或 PayMe 轉帳發放獎金，研究團隊會聯絡中獎者安排。
 
 抽獎電話會透過獨立提交程序收集，與研究答案分開儲存；抽獎聯絡紀錄不含研究參與代碼。每個電話號碼只登記一次。電話只用於抽獎及聯絡得獎者。
 
@@ -49,3 +49,4 @@ Email: [xiangbinteng@cuhk.edu.hk](mailto:xiangbinteng@cuhk.edu.hk)
 完成後你會看到更詳細的研究解說。如有研究問題，請聯絡 Cheng Yee Ting（1155193515@link.cuhk.edu.hk）或 Professor Xiangbin Teng（xiangbinteng@cuhk.edu.hk／3943 3468）。如對研究安排有疑慮，可聯絡香港中文大學心理學系：[dept-research-ethics@psy.cuhk.edu.hk](mailto:dept-research-ethics@psy.cuhk.edu.hk)。
 
 我確認本人已年滿18歲，已閱讀並理解以上資料，並自願同意參與本研究。
+
