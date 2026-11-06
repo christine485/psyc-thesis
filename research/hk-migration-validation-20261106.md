@@ -23,3 +23,11 @@
 - GitHub Pages 正式切換。
 
 正式驗收依照 [MIGRATION_HK.md](../MIGRATION_HK.md) 執行；不可只看首頁或健康檢查便判定已可招募。
+
+## 帳戶建立後的安全部署準備
+
+新增 GitHub Actions 試測部署流程及 `STAGING_ONLY` 限制：試測網頁與 API 可使用同一 Worker 來源，但後端拒絕正式模式寫入；正式切換工具拒絕試測服務。
+
+獨立 Worker 增至 7 項測試，另有 4 項模擬部署測試，合計 33 項本機測試通過。新增測試核對缺少授權時不發出請求、資源隔離、只經 stdin 傳入秘密值、重跑保留既有資源與秘密值，以及錯誤訊息不洩漏授權。Workflow YAML 及獨立 TypeScript 檢查通過。
+
+這些新增測試仍使用模擬 Cloudflare 回應。實際部署需先把 API token 直接存入 GitHub Secret，以及設定指定 Account ID；此紀錄不宣稱已獲遠端授權或已完成部署。

@@ -19,7 +19,7 @@ function complete(plan,token){return {...start(token),drawNonce:crypto.randomUUI
 
 test('health checks actual schema and bucket without exposing records',async()=>{
   const {env}=fixture();const response=await fetchHandler(new Request('https://api.example.test/api/health'),env);
-  assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,protocol:PROTOCOL,images:270,configurationReady:true,storageReady:true,maintenance:false});
+  assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,protocol:PROTOCOL,images:270,configurationReady:true,storageReady:true,maintenance:false,stagingOnly:false});
   env.BUCKET.list=async()=>{throw Error('provider detail');};const failed=await fetchHandler(new Request('https://api.example.test/api/health'),env);assert.equal(failed.status,503);assert.equal((await failed.json()).storageReady,false);
 });
 test('GitHub origin preflight allowed, unknown origins and headers refused',async()=>{
@@ -60,4 +60,17 @@ test('malformed and oversized requests refused before writing, unknown mode neve
   assert.equal((await fetchHandler(req('/api/study/start',{...start(crypto.randomUUID()),mode:'typo'}),env)).status,400);
   assert.equal((await fetchHandler(req('/api/study/start',{data:'x'.repeat(160000)}),env)).status,400);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM slots').get().n,0);
+});
+
+test('isolated staging accepts its own frontend but refuses all live-mode writes',async()=>{
+  const {env,sqlite}=fixture();
+  const ownOrigin='https://api.example.test';
+  assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID()),{Origin:ownOrigin}),env)).status,403);
+  env.STAGING_ONLY='1';
+  const pilot=await fetchHandler(req('/api/study/start',start(crypto.randomUUID()),{Origin:ownOrigin}),env);
+  assert.equal(pilot.status,200);assert.equal(pilot.headers.get('Access-Control-Allow-Origin'),ownOrigin);
+  for(const path of ['/api/study/start','/api/study/submit','/api/draw'])assert.equal((await fetchHandler(req(path,{...start(crypto.randomUUID()),mode:'live'},{Origin:ownOrigin}),env)).status,400);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM slots WHERE mode LIKE 'live:%'").get().n,0);
+  assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID()),{Origin:'https://attacker.example'}),env)).status,403);
+  const health=await(await fetchHandler(new Request(ownOrigin+'/api/health'),env)).json();assert.equal(health.stagingOnly,true);
 });

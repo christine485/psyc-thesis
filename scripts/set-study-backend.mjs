@@ -19,7 +19,7 @@ const response=await fetch(new URL('/api/health',url),{
 });
 if(!response.ok)throw Error('Backend health check failed: HTTP '+response.status);
 const health=await response.json();
-if(health.ok!==true||health.protocol!==PROTOCOL||health.images!==STIMULI.length||health.configurationReady!==true||health.storageReady!==true){
+if(health.ok!==true||health.protocol!==PROTOCOL||health.images!==STIMULI.length||health.configurationReady!==true||health.storageReady!==true||health.stagingOnly===true){
   throw Error('Backend protocol, secrets or storage is not ready. No files were changed.');
 }
 if(response.headers.get('access-control-allow-origin')!=='https://christine485.github.io'){

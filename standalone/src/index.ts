@@ -7,14 +7,16 @@ export interface Env {
   DRAW_SECRET: string;
   ADMIN_TOKEN: string;
   STUDY_MAINTENANCE?: string;
+  STAGING_ONLY?: string;
 }
 const PARTICIPANT_ORIGIN = 'https://christine485.github.io';
 const MAX_BODY_BYTES = 150_000;
 const participantPaths = new Set(['/api/study/start', '/api/study/submit', '/api/draw']);
 const safeHeaders = {'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Vary':'Origin'};
 function headers(req:Request):Record<string,string> {
-  return req.headers.get('Origin') === PARTICIPANT_ORIGIN
-    ? {...safeHeaders,'Access-Control-Allow-Origin':PARTICIPANT_ORIGIN}
+  const origin=req.headers.get('Origin');
+  return origin === PARTICIPANT_ORIGIN || origin === new URL(req.url).origin
+    ? {...safeHeaders,'Access-Control-Allow-Origin':origin}
     : {...safeHeaders};
 }
 function json(req:Request, value:unknown, status=200) {return Response.json(value,{status,headers:headers(req)});}
@@ -47,7 +49,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
     const configurationReady=configured(env);let storageReady=false;
     if(configurationReady)try{await env.DB.prepare('SELECT mode,id,token_hash,expires,plan,submitted,payload FROM slots LIMIT 1').first();await env.BUCKET.list({prefix:'__healthcheck__/',limit:1});storageReady=true;}catch{}
     const ready=configurationReady&&storageReady&&env.STUDY_MAINTENANCE!=='1';
-    return json(req,{ok:ready,protocol:PROTOCOL,images:STIMULI.length,configurationReady,storageReady,maintenance:env.STUDY_MAINTENANCE==='1'},ready?200:503);
+    return json(req,{ok:ready,protocol:PROTOCOL,images:STIMULI.length,configurationReady,storageReady,maintenance:env.STUDY_MAINTENANCE==='1',stagingOnly:env.STAGING_ONLY==='1'},ready?200:503);
   }
   if(path==='/api/admin/export'||path==='/api/admin/status') {
     if(req.method!=='GET')return json(req,{error:'Method not allowed'},405);
@@ -69,7 +71,8 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
     }catch{return json(req,{error:'暫時無法讀取研究資料。'},503);}
   }
   if(!participantPaths.has(path))return json(req,{error:'Not found'},404);
-  if(req.headers.get('Origin')!==PARTICIPANT_ORIGIN)return json(req,{error:'此頁面的來源未獲允許。'},403);
+  const origin=req.headers.get('Origin');
+  if(origin!==PARTICIPANT_ORIGIN&&!(env.STAGING_ONLY==='1'&&origin===url.origin))return json(req,{error:'此頁面的來源未獲允許。'},403);
   if(req.method==='OPTIONS') {
     if(req.headers.get('Access-Control-Request-Method')!=='POST')return json(req,{error:'Method not allowed'},405);
     const requested=(req.headers.get('Access-Control-Request-Headers')||'').toLowerCase().split(',').map(h=>h.trim()).filter(Boolean);
@@ -81,6 +84,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
   if(!configured(env))return json(req,{error:'研究服務尚未準備好，請稍後再試。'},503);
   let body:any;try{body=await readBody(req);}catch{return json(req,{error:'資料格式不正確或資料過大。'},400);}
   if(!['pilot','live'].includes(body.mode))return json(req,{error:'研究模式不正確。'},400);
+  if(env.STAGING_ONLY==='1'&&body.mode!=='pilot')return json(req,{error:'此網站只供試測，不能接收正式研究資料。'},400);
   try{
     const study=createStudyServer(()=>env);
     const value=path==='/api/study/start'?await study.allocate(body):path==='/api/study/submit'?await study.submit(body):await study.enterDraw(body);return json(req,value);
