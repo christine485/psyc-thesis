@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "psyc-thesis-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "workers_dev": true,
+  "observability": {"enabled": false},
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "psyc-thesis-research",
+    "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID",
+    "migrations_dir": "migrations"
+  }],
+  "r2_buckets": [{"binding":"BUCKET","bucket_name":"psyc-thesis-draw"}]
+}
