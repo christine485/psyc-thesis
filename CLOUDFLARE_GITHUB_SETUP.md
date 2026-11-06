@@ -1,5 +1,7 @@
 # Cloudflare 帳戶已建立：安全授權與獨立試測
 
+如果已在 Cloudflare 的 Create an app 畫面連接 GitHub，請使用較直接的 [Cloudflare 畫面指引](CLOUDFLARE_DASHBOARD_SETUP.md)。以下是另一條進階途徑。
+
 註冊帳戶並不會自動授權部署。這份設定把 Cloudflare API token 直接放入 GitHub 的加密 Secrets，不經聊天或公開程式碼。GitHub Actions 會部署獨立試測網站；正式 GitHub Pages 網址、原 Sites 服務及正式研究資料繼續保留。
 
 ## 1. Cloudflare 一次性設定
@@ -34,11 +36,11 @@ Account Resources 選 **Include → Specific account → 你的新帳戶**。這
 | [Secrets → New repository secret](https://github.com/christine485/psyc-thesis/settings/secrets/actions/new) | `CLOUDFLARE_API_TOKEN` | 剛建立的 token |
 | [Variables → New repository variable](https://github.com/christine485/psyc-thesis/settings/variables/actions/new) | `CLOUDFLARE_ACCOUNT_ID` | 新帳戶的 Account ID |
 
-兩項儲存完成後，在對話回覆「授權已設定」。不用提供任何秘密值。代理可以重新執行預先建立的 GitHub Actions 工作；它讀不到 Secret 原文。
+兩項儲存完成後，在 GitHub Actions 選擇 **Deploy Hong Kong staging → Run workflow**，執行 `main` 分支。不要在對話提供秘密值。
 
 ## 4. 部署結果及後續驗收
 
-工作名稱是 **Deploy Hong Kong staging**，只在 `prepare-hk-independent-backend` 分支推送或手動執行時運作，並以固定名稱建立／重用：
+工作名稱是 **Deploy Hong Kong staging**。推送至主分支或準備分支只執行程式驗證；只有手動執行且已設定 Account ID 時才進行部署，並以固定名稱建立／重用：
 
 - Worker：`psyc-thesis-hk-staging-api`
 - D1：`psyc-thesis-hk-staging-research`

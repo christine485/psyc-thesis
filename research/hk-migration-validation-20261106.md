@@ -31,3 +31,11 @@
 獨立 Worker 增至 7 項測試，另有 4 項模擬部署測試，合計 33 項本機測試通過。新增測試核對缺少授權時不發出請求、資源隔離、只經 stdin 傳入秘密值、重跑保留既有資源與秘密值，以及錯誤訊息不洩漏授權。Workflow YAML 及獨立 TypeScript 檢查通過。
 
 這些新增測試仍使用模擬 Cloudflare 回應。實際部署需先把 API token 直接存入 GitHub Secret，以及設定指定 Account ID；此紀錄不宣稱已獲遠端授權或已完成部署。
+
+## Cloudflare 原生 GitHub 建立畫面
+
+使用者其後選用 Cloudflare 原生建立畫面；其自動 token 權限提示已確認含 D1 Storage Edit 與 R2 Edit。新增 `npm run study:build` 及 `npm run study:deploy`，透過 Wrangler 的正常認證操作，不要求部署腳本自行讀取 token。
+
+新增 11 項原生部署模擬測試，核對帳戶識別、CLI 格式、固定試測名稱、資源建立後再確認、既有／部分秘密值保留、URL 來源及健康檢查失敗，全部通過。合計 44 項本機測試；`study:build` 已實際執行成功。命令與格式已對照固定 Wrangler 4.92.0 的實作審閱。
+
+原生 Cloudflare 的真實授權、R2 啟用及新服務部署，仍需在建立畫面完成後驗證。GitHub 推送只驗證程式；進階 GitHub Actions 部署改為手動選用，避免與原生部署重複操作。

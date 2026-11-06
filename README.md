@@ -7,6 +7,8 @@
 ## 狀態
 香港無 VPN 遷移準備：新增 `standalone/` 獨立 Cloudflare Workers 後端、完整資料備份／匯入準備工具，以及 GitHub Pages 同來源 PNG 圖片。**新後端尚未部署、舊資料尚未搬移、香港網絡尚未驗收，API 設定仍保留舊服務。** 註冊 Cloudflare、部署、凍結寫入、資料核對及切換步驟見 [香港遷移指引](MIGRATION_HK.md)。
 
+Cloudflare 的 GitHub 建立畫面逐格填寫內容見 [畫面設定指引](CLOUDFLARE_DASHBOARD_SETUP.md)。
+
 已獲公開刺激材料授權，網站預設為正式研究模式；裝置與香港網絡仍需實測。請先使用試測模式，勿將「15分鐘目標」或圖片覆蓋數當作已驗證的統計檢定力。
 
 ## 參加流程

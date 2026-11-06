@@ -2,7 +2,7 @@ name: Deploy Hong Kong staging
 
 on:
   push:
-    branches: [prepare-hk-independent-backend]
+    branches: [main, prepare-hk-independent-backend]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,9 @@ jobs:
           node tests/server.test.mjs
           node tests/migration.test.mjs
           node tests/staging-deploy.test.mjs
+          node tests/cloudflare-native-deploy.test.mjs
       - name: Deploy isolated staging
+        if: ${{ github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_ACCOUNT_ID != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

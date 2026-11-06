@@ -2,7 +2,7 @@
 
 目標入口保持：<https://christine485.github.io/psyc-thesis/>。
 
-帳戶已建立但尚未安全授權時，使用 [GitHub Actions 安全設定指引](CLOUDFLARE_GITHUB_SETUP.md) 先部署隔離試測網站。此流程不切換正式入口。
+帳戶已建立並在 Cloudflare 選擇 GitHub 程式庫時，使用 [Cloudflare 畫面逐格設定](CLOUDFLARE_DASHBOARD_SETUP.md) 部署隔離試測網站。另有 [GitHub Actions 安全設定指引](CLOUDFLARE_GITHUB_SETUP.md)。兩者均不切換正式 API。
 
 目前程式已準備獨立 Cloudflare Workers 後端，但**未部署、未遷移正式資料、未完成香港無 VPN 實測，正式入口未切換**。不能將本機測試或海外雲端成功連線當成香港驗收結果。
 
