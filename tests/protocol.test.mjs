@@ -13,6 +13,13 @@ test('phone normalization and CSV formula protection',()=>{assert.equal(normaliz
 
 test('Hong Kong draw numbers accept local and country code formats only',()=>{for(const value of ['91234567','+852 9123 4567','85291234567','９１２３４５６７'])assert.equal(normalizePhone(value),'+85291234567');assert.equal(normalizePhone('85234567'),'+85285234567');for(const value of ['+8613812345678','+447700900123','12345678','+8529123456','+852912345678',''])assert.equal(normalizePhone(value),null,value);const {p,body,seed}=sample();body.consent='cloud-flow-consent-20261101-v1';assert.throws(()=>validateSubmission(body,p,seed));});
 
-test('all 270 web wrappers contain the exact original PNG bytes',()=>{for(const s of STIMULI){const svg=fs.readFileSync(new URL('../docs/stimuli/'+s.file.replace('.png','.svg'),import.meta.url),'utf8');const match=svg.match(/data:image\/png;base64,([^"]+)/);assert.ok(match,s.file);const bytes=Buffer.from(match[1],'base64');assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),s.sha256);assert.ok(svg.includes('viewBox="0 0 1024 1024"'));}});
+test('GitHub Pages images use the local PNG manifest without a backend dependency',()=>{
+ const config=fs.readFileSync(new URL('../docs/config.js',import.meta.url),'utf8');
+ const app=fs.readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
+ assert.ok(config.includes("new URL('./stimuli/',import.meta.url).href"));
+ assert.ok(app.includes('STIMULUS_BASE+file;'));
+ assert.ok(!app.includes("file.replace(/\\.png"));
+ for(const s of STIMULI)assert.ok(fs.existsSync(new URL('../docs/stimuli/'+s.file,import.meta.url)),s.file);
+});
 
 test('November pilot bank uses verified aggregate counts and all four replacements',async()=>{const {PILOT}=await import('../docs/modules/bank.mjs');const {PROTOCOL}=await import('../docs/modules/protocol.mjs');assert.equal(PILOT.sampleSize,100);assert.equal(PILOT.sourceSHA256,'f4474dc5b0f0ab2263bf1c09303d8c6e5c9bc6d62b86185010a70d880b5302df');assert.equal(PROTOCOL,'cloud-flow-naming-fit-v3-hk20261104');const expected={FEA:['害怕','驚慌','驚嚇'],DIS:['討厭','反感','嫌棄'],CON:['滿足','滿意','充實'],AMU:['愉快','暢快','歡樂']};for(const [id,words] of Object.entries(expected))assert.deepEqual(FAMILIES.find(f=>f.id===id).selected,words);for(const f of FAMILIES)for(const w of f.words)assert.ok(Number.isFinite(w.mean)&&w.mean>=1&&w.mean<=5);assert.equal(FAMILIES.find(f=>f.id==='HAP').words.find(w=>w.word==='開心').mean,348/100);const t={type:'main',stimulus:STIMULI[0].file};assert.deepEqual(new Set(ratingWords('害怕、討厭、滿足',t,'pilot-update')),new Set([...expected.FEA,...expected.DIS,...expected.CON]));});

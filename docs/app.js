@@ -1,7 +1,7 @@
 import {PROTOCOL,CONSENT,TOTAL,SCALE,EDUCATION,parseWords,ratingWords,normalizePhone,makePlan} from './modules/protocol.mjs?v=hk-formal-20261104';
-import {API_BASE,STIMULUS_BASE} from './config.js';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
+import {API_BASE,STIMULUS_BASE} from './config.js?v=hk-backend-20261106';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
 const root=document.querySelector('#app'),query=new URLSearchParams(location.search);
-const stimulusURL=file=>STIMULUS_BASE+file.replace(/\.png$/i,'.svg');
+const stimulusURL=file=>STIMULUS_BASE+file;
 const mode=query.get('mode')==='pilot'?'pilot':'live',preview=query.get('preview')==='1';
 const state={page:'consent',plan:null,index:0,phase:'naming',freeText:'',words:[],ratings:{},responses:[],loaded:false,busy:false,error:'',paused:false,t0:0,namingMs:0,pauseAt:0,token:crypto.randomUUID(),drawNonce:crypto.randomUUID(),researchDone:false,drawPermit:null,eligible:null,drawChoice:'no',phone:'',drawDone:false,demographics:{gender:'',age:'',education:''}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

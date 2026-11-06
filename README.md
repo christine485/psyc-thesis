@@ -1,10 +1,14 @@
 # A Lexicon Without Objects
 繁體中文抽象圖像與情緒詞語研究。
 
-網站入口：[開始正式實驗](https://cloud-flow-emotion-study.christine040805.chatgpt.site/?mode=live)。
+網站入口：[GitHub Pages 實驗](https://christine485.github.io/psyc-thesis/)。
 研究人員：[查看試測資料](https://cloud-flow-emotion-study.christine040805.chatgpt.site/researcher?mode=pilot)，需以網站擁有者帳戶登入。
 
 ## 狀態
+香港無 VPN 遷移準備：新增 `standalone/` 獨立 Cloudflare Workers 後端、完整資料備份／匯入準備工具，以及 GitHub Pages 同來源 PNG 圖片。**新後端尚未部署、舊資料尚未搬移、香港網絡尚未驗收，API 設定仍保留舊服務。** 註冊 Cloudflare、部署、凍結寫入、資料核對及切換步驟見 [香港遷移指引](MIGRATION_HK.md)。
+
+Cloudflare 的 GitHub 建立畫面逐格填寫內容見 [畫面設定指引](CLOUDFLARE_DASHBOARD_SETUP.md)。
+
 已獲公開刺激材料授權，網站預設為正式研究模式；裝置與香港網絡仍需實測。請先使用試測模式，勿將「15分鐘目標」或圖片覆蓋數當作已驗證的統計檢定力。
 
 ## 參加流程
@@ -21,6 +25,7 @@
 ## 執行與部署
 `docs/` 是可直接由GitHub Pages發佈的靜態前端。將Pages來源設定為main分支的/docs。
 後端為Vinext/Cloudflare Worker，使用Sites提供的D1、R2及研究人員登入。
+獨立遷移版本在 `standalone/`，共用同一研究邏輯，使用獨立 D1／R2 和管理秘密值；它不依賴 ChatGPT 登入或 Sites 平台。部署與驗收前不要直接切換正式 API。
 前端API位置由 `docs/config.js` 設定；後端僅允許同源及指定的GitHub Pages來源。
 正式研究頁不要求參加者登入。
 
