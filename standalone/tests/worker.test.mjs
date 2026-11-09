@@ -1,26 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import {DatabaseSync} from 'node:sqlite';
 import {fetchHandler} from '../src/index.ts';
+import {sqliteD1} from './sqlite-d1.mjs';
 import {PROTOCOL,CONSENT,ratingWords} from '../../docs/modules/protocol.mjs';
 const origin='https://christine485.github.io';
 function fixture(){
-  const sqlite=new DatabaseSync(':memory:');sqlite.exec(fs.readFileSync(new URL('../migrations/0001_slots.sql',import.meta.url),'utf8'));
-  const statement=(sql,args=[])=>({bind(...next){return statement(sql,next);},first:async()=>sqlite.prepare(sql).get(...args)||null,run:async()=>({meta:{changes:Number(sqlite.prepare(sql).run(...args).changes)}}),all:async()=>({results:sqlite.prepare(sql).all(...args)})});
-  const DB={prepare:sql=>statement(sql),async batch(items){sqlite.exec('BEGIN');try{const result=[];for(const item of items)result.push(await item.run());sqlite.exec('COMMIT');return result;}catch(error){sqlite.exec('ROLLBACK');throw error;}}};
-  const objects=new Map();const BUCKET={async put(key,value,opts){if(opts?.onlyIf&&objects.has(key))return null;objects.set(key,value);return {key};},async get(key){return objects.has(key)?{json:async()=>JSON.parse(objects.get(key))}:null;},async list({prefix,limit=1000}){return {objects:[...objects.keys()].filter(x=>x.startsWith(prefix)).slice(0,limit).map(key=>({key})),truncated:false};}};
-  return {env:{DB,BUCKET,DRAW_SECRET:'synthetic-draw-key-at-least-32-characters',ADMIN_TOKEN:'synthetic-admin-token-at-least-32-characters'},sqlite,objects};
+  const {sqlite,DB}=sqliteD1(new URL('../migrations/0001_slots.sql',import.meta.url));
+  const {sqlite:contacts,DB:CONTACTS_DB}=sqliteD1(new URL('../contact-migrations/0001_contacts.sql',import.meta.url));
+  return {env:{DB,CONTACTS_DB,DRAW_SECRET:'synthetic-draw-key-at-least-32-characters',ADMIN_TOKEN:'synthetic-admin-token-at-least-32-characters'},sqlite,contacts};
 }
 function req(path,body,extra={}){return new Request('https://api.example.test'+path,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',...extra},body:JSON.stringify(body)});}
 function admin(path,env,extra={}){return new Request('https://api.example.test'+path,{headers:{Authorization:'Bearer '+env.ADMIN_TOKEN,...extra}});}
 const start=token=>({token,mode:'pilot',protocol:PROTOCOL,consent:CONSENT,consented:true});
 function complete(plan,token){return {...start(token),drawNonce:crypto.randomUUID(),demographics:{gender:'女',age:23,education:'學士'},device:{kind:'手機',viewportWidth:390,viewportHeight:844},responses:plan.trials.map(t=>{const freeText=t.type==='attention'?'2':'系統測試勿分析';return {type:t.type,stimulus:t.stimulus,freeText,ratings:Object.fromEntries(ratingWords(freeText,t,plan.rowSeed).map(w=>[w,2])),durationMs:8000,namingMs:3000,width:310,height:310};})};}
 
-test('health checks actual schema and bucket without exposing records',async()=>{
-  const {env}=fixture();const response=await fetchHandler(new Request('https://api.example.test/api/health'),env);
+test('health checks both actual database schemas without exposing records',async()=>{
+  const {env,contacts}=fixture();const response=await fetchHandler(new Request('https://api.example.test/api/health'),env);
   assert.equal(response.status,200);assert.deepEqual(await response.json(),{ok:true,protocol:PROTOCOL,images:270,configurationReady:true,storageReady:true,maintenance:false,stagingOnly:false});
-  env.BUCKET.list=async()=>{throw Error('provider detail');};const failed=await fetchHandler(new Request('https://api.example.test/api/health'),env);assert.equal(failed.status,503);assert.equal((await failed.json()).storageReady,false);
+  contacts.exec('DROP TABLE contact_objects');const failed=await fetchHandler(new Request('https://api.example.test/api/health'),env);assert.equal(failed.status,503);assert.equal((await failed.json()).storageReady,false);
 });
 test('GitHub origin preflight allowed, unknown origins and headers refused',async()=>{
   const {env}=fixture();const preflight=new Request('https://api.example.test/api/study/start',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}});
@@ -34,17 +31,26 @@ test('admin export and counts require secret, reject cross-origin and secretless
   assert.equal((await fetchHandler(admin('/api/admin/status',env,{Origin:origin}),env)).status,403);
   assert.equal((await fetchHandler(admin('/api/admin/status',env),env)).status,200);
   assert.equal((await fetchHandler(admin('/api/admin/export?mode=typo&kind=draw',env),env)).status,400);
+  const contacts=env.CONTACTS_DB;env.CONTACTS_DB=undefined;assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID())),env)).status,503);env.CONTACTS_DB=contacts;
   env.DRAW_SECRET='';assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID())),env)).status,503);
 });
 test('full pilot flow saves once, preserves live isolation, draw and research remain separate',async()=>{
-  const {env,objects}=fixture(),token=crypto.randomUUID();const allocation=await fetchHandler(req('/api/study/start',start(token)),env);assert.equal(allocation.status,200);
+  const {env,sqlite,contacts}=fixture(),token=crypto.randomUUID();const allocation=await fetchHandler(req('/api/study/start',start(token)),env);assert.equal(allocation.status,200);
   const plan=await allocation.json();assert.equal(plan.trials.length,28);const body=complete(plan,token);
   const first=await fetchHandler(req('/api/study/submit',body),env);assert.equal(first.status,200);const result=await first.json();assert.equal(result.submitted,true);assert.equal(result.eligible,true);
   const retry=await fetchHandler(req('/api/study/submit',body),env);assert.deepEqual(await retry.json(),result);
   const status=await(await fetchHandler(admin('/api/admin/status',env),env)).json();assert.equal(status.modes.pilot.submitted,1);assert.equal(status.modes.live.submitted,0);
   const research=await(await fetchHandler(admin('/api/admin/export?mode=pilot&kind=research',env),env)).text();assert.ok(research.includes('系統測試勿分析'));assert.ok(!research.includes(body.drawNonce));
   const draw=await fetchHandler(req('/api/draw',{mode:'pilot',permit:result.drawPermit,phone:'91234567'}),env);assert.equal(draw.status,200);
-  assert.ok(!research.includes('91234567'));assert.ok(!JSON.stringify([...objects.values()]).includes(token));
+  assert.equal((await fetchHandler(req('/api/draw',{mode:'pilot',permit:result.drawPermit,phone:'91234567'}),env)).status,200);
+  assert.equal((await fetchHandler(req('/api/draw',{mode:'pilot',permit:result.drawPermit,phone:'92345678'}),env)).status,400);
+  const storedContacts=contacts.prepare('SELECT key,value FROM contact_objects').all();
+  assert.equal(storedContacts.length,2);assert.ok(storedContacts.every(row=>row.key.startsWith('pilot/')));
+  assert.ok(!research.includes('91234567'));assert.ok(!JSON.stringify(storedContacts).includes(token));
+  const storedResearch=JSON.stringify(sqlite.prepare('SELECT * FROM slots').all());
+  assert.ok(!storedResearch.includes('91234567'));assert.ok(!storedResearch.includes(body.drawNonce));assert.ok(!storedResearch.includes(result.drawPermit));
+  assert.ok(!/participantCode|responses|rowSeed|token_hash/.test(JSON.stringify(storedContacts)));
+  assert.throws(()=>contacts.prepare('SELECT * FROM slots'),/no such table/);assert.throws(()=>sqlite.prepare('SELECT * FROM contact_objects'),/no such table/);
   const phones=await(await fetchHandler(admin('/api/admin/export?mode=pilot&kind=draw',env),env)).text();assert.ok(phones.includes('91234567'));assert.ok(!phones.includes('participant_code'));
 });
 test('maintenance freezes all participant writes while authenticated status/export work',async()=>{

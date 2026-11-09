@@ -9,7 +9,7 @@ import {randomBytes,createHash} from 'node:crypto';
 import {STIMULI,PROTOCOL} from '../docs/modules/protocol.mjs';
 
 const ROOT=fileURLToPath(new URL('../',import.meta.url));
-export const STAGING=Object.freeze({worker:'psyc-thesis-hk-staging-api',database:'psyc-thesis-hk-staging-research',bucket:'psyc-thesis-hk-staging-draw'});
+export const STAGING=Object.freeze({worker:'psyc-thesis-hk-staging-api',database:'psyc-thesis-hk-staging-research',contactsDatabase:'psyc-thesis-hk-staging-draw'});
 
 export function requireCredentials(env){
  if(!env.CLOUDFLARE_API_TOKEN)throw Error('Add the CLOUDFLARE_API_TOKEN GitHub Actions repository secret. Do not put the token in workflow inputs or chat.');
@@ -17,7 +17,13 @@ export function requireCredentials(env){
  return env.CLOUDFLARE_ACCOUNT_ID;
 }
 
-export async function prepareConfig(temp,accountId,databaseId){
+function validateDatabaseIds(databaseId,contactsDatabaseId){
+ if(typeof databaseId!=='string'||!databaseId||typeof contactsDatabaseId!=='string'||!contactsDatabaseId)throw Error('Cloudflare did not return both D1 database IDs. No ID was guessed.');
+ if(databaseId.toLowerCase()===contactsDatabaseId.toLowerCase())throw Error('Research answers and draw contacts require separate D1 databases. The returned database IDs match.');
+}
+
+export async function prepareConfig(temp,accountId,databaseId,contactsDatabaseId){
+ validateDatabaseIds(databaseId,contactsDatabaseId);
  const assets=path.join(temp,'assets');
  await fs.cp(path.join(ROOT,'docs'),assets,{recursive:true});
  for(const item of STIMULI){
@@ -31,8 +37,10 @@ export async function prepareConfig(temp,accountId,databaseId){
  await fs.writeFile(appPath,app.replace(original,"const mode='pilot',preview="));
  const config={name:STAGING.worker,account_id:accountId,main:path.join(ROOT,'standalone/src/index.ts'),compatibility_date:'2026-05-15',workers_dev:true,
   observability:{enabled:false},vars:{STAGING_ONLY:'1'},assets:{directory:assets,run_worker_first:['/api/*']},
-  d1_databases:[{binding:'DB',database_name:STAGING.database,database_id:databaseId,migrations_dir:path.join(ROOT,'standalone/migrations')}],
-  r2_buckets:[{binding:'BUCKET',bucket_name:STAGING.bucket}]};
+  d1_databases:[
+   {binding:'DB',database_name:STAGING.database,database_id:databaseId,migrations_dir:path.join(ROOT,'standalone/migrations')},
+   {binding:'CONTACTS_DB',database_name:STAGING.contactsDatabase,database_id:contactsDatabaseId,migrations_dir:path.join(ROOT,'standalone/contact-migrations')}
+  ]};
  const configPath=path.join(temp,'wrangler.json');
  await fs.writeFile(configPath,JSON.stringify(config,null,2)+'\n',{mode:0o600});
  return configPath;
@@ -59,15 +67,14 @@ export async function deployStaging({env=process.env,fetchImpl=fetch,run=runWran
   }catch{throw Error('Cloudflare API could not be reached or returned an invalid response. Retry after checking network access.');}
   if(!response.ok||value.success!==true){
    const codes=(value.errors||[]).map(x=>Number(x.code)).filter(Number.isFinite).join(',');
-   throw Error('Cloudflare API refused the staging operation (HTTP '+response.status+(codes?', code '+codes:'')+'). Check account ID, token permissions and that R2 is activated.');
+   throw Error('Cloudflare API refused the staging operation (HTTP '+response.status+(codes?', code '+codes:'')+'). Check account ID and token permissions.');
   }
   return value.result;
  }
- // Read the intended account and R2 before creating resources. Never enable billing automatically.
+ // Read the intended account and existing D1 databases before creating resources.
+ // This deployment never enables billing or changes the account plan.
  const subdomain=await api(base+'/workers/subdomain');
  if(typeof subdomain?.subdomain!=='string'||!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(subdomain.subdomain))throw Error('Complete Workers & Pages setup in the Cloudflare dashboard and choose a workers.dev subdomain, then rerun.');
- const buckets=await api(base+'/r2/buckets');
- if(!Array.isArray(buckets?.buckets))throw Error('Cloudflare did not return an R2 bucket list. Activate R2 in the dashboard before deploying.');
  let databases=[];
  for(let page=1;page<=100;page++){
   const rows=await api(base+'/d1/database?per_page=100&page='+page);
@@ -77,19 +84,21 @@ export async function deployStaging({env=process.env,fetchImpl=fetch,run=runWran
   if(page===100)throw Error('D1 database listing exceeded the safety limit. No staging resources were created.');
  }
  const matches=databases.filter(x=>x.name===STAGING.database);
- if(matches.length>1)throw Error('More than one staging database matches. Resolve the duplicate names before deployment.');
- let db=matches[0],createdDatabase=false,createdBucket=false;
+ const contactsMatches=databases.filter(x=>x.name===STAGING.contactsDatabase);
+ if(matches.length>1||contactsMatches.length>1)throw Error('More than one staging database matches. Resolve the duplicate names before deployment.');
+ let db=matches[0],contactsDb=contactsMatches[0],createdDatabase=false,createdContactsDatabase=false;
  if(!db){db=await api(base+'/d1/database',{method:'POST',body:{name:STAGING.database}});createdDatabase=true;}
- if(typeof db.uuid!=='string'||!db.uuid)throw Error('Cloudflare did not return the created D1 database ID. No ID was guessed.');
- if(!buckets.buckets.some(x=>x.name===STAGING.bucket)){await api(base+'/r2/buckets',{method:'POST',body:{name:STAGING.bucket}});createdBucket=true;}
+ if(!contactsDb){contactsDb=await api(base+'/d1/database',{method:'POST',body:{name:STAGING.contactsDatabase}});createdContactsDatabase=true;}
+ validateDatabaseIds(db?.uuid,contactsDb?.uuid);
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),'psyc-hk-staging-'));
  try{
-  const config=await prepareConfig(temp,accountId,db.uuid);
+  const config=await prepareConfig(temp,accountId,db.uuid,contactsDb.uuid);
   // Wrangler otherwise writes debug request logs. A .log symlink to the null
   // device prevents secret bulk request bodies from ever being retained.
   const logPath=path.join(temp,'wrangler.log');await fs.symlink(os.devNull,logPath);
   const operationEnv={...env,WRANGLER_LOG_PATH:logPath};
   await run(['d1','migrations','apply',STAGING.database,'--remote','--config',config],{env:operationEnv});
+  await run(['d1','migrations','apply',STAGING.contactsDatabase,'--remote','--config',config],{env:operationEnv});
   await run(['deploy','--keep-vars','--config',config],{env:operationEnv});
   const secrets=await api(base+'/workers/scripts/'+STAGING.worker+'/secrets');
   if(!Array.isArray(secrets))throw Error('Cloudflare did not return the staging secret names.');
@@ -107,8 +116,8 @@ export async function deployStaging({env=process.env,fetchImpl=fetch,run=runWran
    if(attempt<5)await new Promise(resolve=>setTimeout(resolve,2000));
   }
   if(!ready)throw Error('Staging deployed, but its health check is not ready. Inspect the deployment before inviting testers; do not switch production.');
-  const result={url:origin+'/?mode=pilot',databaseId:db.uuid,createdDatabase,createdBucket,productionChanged:false};
-  const summary='### Hong Kong staging experiment\n\n'+result.url+'\n\nHealth, protocol and storage checks passed. Production entry and research data were not changed. Hong Kong without-VPN participant acceptance is still required.\n\nD1: `'+STAGING.database+'` (`'+db.uuid+'`)\n\nR2: `'+STAGING.bucket+'`\n';
+  const result={url:origin+'/?mode=pilot',databaseId:db.uuid,contactsDatabaseId:contactsDb.uuid,createdDatabase,createdContactsDatabase,productionChanged:false};
+  const summary='### Hong Kong staging experiment\n\n'+result.url+'\n\nHealth, protocol and storage checks passed. Production entry and research data were not changed. Hong Kong without-VPN participant acceptance is still required.\n\nResearch D1: `'+STAGING.database+'` (`'+db.uuid+'`)\n\nDraw contacts D1: `'+STAGING.contactsDatabase+'` (`'+contactsDb.uuid+'`)\n';
   if(env.GITHUB_STEP_SUMMARY)await fs.appendFile(env.GITHUB_STEP_SUMMARY,summary);
   report(JSON.stringify(result));
   return result;

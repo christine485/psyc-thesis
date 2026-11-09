@@ -9,7 +9,7 @@
 在 [Cloudflare Dashboard](https://dash.cloudflare.com/) 選擇你的新帳戶：
 
 - 在 **Workers & Pages** 確認已有 **Your subdomain**，例如你選擇的名稱加 `.workers.dev`。如有首次設定畫面，先完成設定；毋須購買網域。
-- 在 **R2 Object Storage** 完成啟用。它可能要求付款方式；先閱讀畫面價格及用量限制。部署程式不會代你啟用付費訂閱。
+- 帳戶維持 **Workers Free**。新版本只使用兩個獨立 D1，毋須啟用 R2 或選擇付費方案。
 - 複製此帳戶的 **Account ID**。它是 32 位字元，不是電郵、密碼或 API token。[官方尋找方法](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/)。
 
 ## 2. 建立限於這個帳戶的 API token
@@ -21,7 +21,6 @@
 | Account | Account Settings | Read |
 | Account | Workers Scripts | Edit |
 | Account | D1 | Edit |
-| Account | Workers R2 Storage | Edit |
 
 Account Resources 選 **Include → Specific account → 你的新帳戶**。這個流程不需要 Zone／DNS 權限。若介面使用 Write 而非 Edit 字眼，對應所需的寫入權限。權限名稱參考 [Cloudflare 官方清單](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)。
 
@@ -43,13 +42,13 @@ Account Resources 選 **Include → Specific account → 你的新帳戶**。這
 工作名稱是 **Deploy Hong Kong staging**。推送至主分支或準備分支只執行程式驗證；只有手動執行且已設定 Account ID 時才進行部署，並以固定名稱建立／重用：
 
 - Worker：`psyc-thesis-hk-staging-api`
-- D1：`psyc-thesis-hk-staging-research`
-- R2：`psyc-thesis-hk-staging-draw`
+- 研究 D1：`psyc-thesis-hk-staging-research`
+- 抽獎 D1：`psyc-thesis-hk-staging-draw`
 
 它先通過程式測試，再建立隔離儲存、套用 schema、部署 Worker 和 270 張已核對的圖片。試測網頁固定使用 pilot 模式，後端拒絕正式模式寫入；正式切換工具亦拒絕此試測服務。
 
 首次部署會自動生成試測用 `DRAW_SECRET` 及 `ADMIN_TOKEN`，只存入 Cloudflare Worker Secrets；重跑不會更換既有值。管理 token 不會展示在工作日誌，亦不會公開下載。日後如需研究者直接下載試測結果，須先在 Cloudflare 將試測 `ADMIN_TOKEN` 安全設成研究者保管的隨機秘密值；不要改動抽獎密鑰。此設定不涉及正式資料的原有密鑰。
 
-成功後 [GitHub Actions](https://github.com/christine485/psyc-thesis/actions) 的工作摘要會提供實際試測網址。健康檢查通過只表示設定與儲存可讀，仍須進行香港無 VPN 完整試測及確認答案持久化。原資料搬遷及正式切換依 [MIGRATION_HK.md](MIGRATION_HK.md) 執行。
+成功後 [GitHub Actions](https://github.com/christine485/psyc-thesis/actions) 的工作摘要會提供實際試測網址。健康檢查通過只表示設定與儲存可讀，仍須進行香港無 VPN 完整試測及確認答案持久化。免費額度有上限；程式不會開通訂閱或升級方案，實際帳戶方案需維持 Free。原資料搬遷及正式切換依 [MIGRATION_HK.md](MIGRATION_HK.md) 執行。
 
 官方部署說明：[Cloudflare 與 GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/)。

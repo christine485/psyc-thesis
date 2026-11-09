@@ -1,9 +1,10 @@
 import {createStudyServer} from '../../lib/study-core.ts';
 import {PROTOCOL, STIMULI} from '../../docs/modules/protocol.mjs';
+import {createContactStore} from './contact-store.ts';
 
 export interface Env {
   DB: D1Database;
-  BUCKET: R2Bucket;
+  CONTACTS_DB: D1Database;
   DRAW_SECRET: string;
   ADMIN_TOKEN: string;
   STUDY_MAINTENANCE?: string;
@@ -20,7 +21,8 @@ function headers(req:Request):Record<string,string> {
     : {...safeHeaders};
 }
 function json(req:Request, value:unknown, status=200) {return Response.json(value,{status,headers:headers(req)});}
-function configured(env:Env) {return !!(env.DB && env.BUCKET && env.DRAW_SECRET?.length>0 && env.ADMIN_TOKEN?.length>=32);}
+function configured(env:Env) {return !!(env.DB && env.CONTACTS_DB && env.DRAW_SECRET?.length>0 && env.ADMIN_TOKEN?.length>=32);}
+function studyServer(env:Env) {return createStudyServer(()=>({DB:env.DB,BUCKET:createContactStore(env.CONTACTS_DB),DRAW_SECRET:env.DRAW_SECRET}));}
 export async function authorized(req:Request,env:Env) {
   if(!env.ADMIN_TOKEN || env.ADMIN_TOKEN.length<32) return false;
   const auth=req.headers.get('Authorization');
@@ -47,7 +49,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
   const url=new URL(req.url),path=url.pathname;
   if(path==='/api/health' && req.method==='GET') {
     const configurationReady=configured(env);let storageReady=false;
-    if(configurationReady)try{await env.DB.prepare('SELECT mode,id,token_hash,expires,plan,submitted,payload FROM slots LIMIT 1').first();await env.BUCKET.list({prefix:'__healthcheck__/',limit:1});storageReady=true;}catch{}
+    if(configurationReady)try{await env.DB.prepare('SELECT mode,id,token_hash,expires,plan,submitted,payload FROM slots LIMIT 1').first();await env.CONTACTS_DB.prepare('SELECT key,value FROM contact_objects LIMIT 1').first();storageReady=true;}catch{}
     const ready=configurationReady&&storageReady&&env.STUDY_MAINTENANCE!=='1';
     return json(req,{ok:ready,protocol:PROTOCOL,images:STIMULI.length,configurationReady,storageReady,maintenance:env.STUDY_MAINTENANCE==='1',stagingOnly:env.STAGING_ONLY==='1'},ready?200:503);
   }
@@ -66,7 +68,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
       }
       const mode=url.searchParams.get('mode'),kind=url.searchParams.get('kind');
       if(!['pilot','live'].includes(mode||'')||!['research','draw'].includes(kind||''))return json(req,{error:'請指定 mode=pilot 或 live，以及 kind=research 或 draw。'},400);
-      const study=createStudyServer(()=>env);const data=await(kind==='draw'?study.drawCSV(mode!):study.researchCSV(mode!));
+      const study=studyServer(env);const data=await(kind==='draw'?study.drawCSV(mode!):study.researchCSV(mode!));
       return new Response(data,{headers:{...safeHeaders,'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${mode}-${kind}.csv"`}});
     }catch{return json(req,{error:'暫時無法讀取研究資料。'},503);}
   }
@@ -86,7 +88,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
   if(!['pilot','live'].includes(body.mode))return json(req,{error:'研究模式不正確。'},400);
   if(env.STAGING_ONLY==='1'&&body.mode!=='pilot')return json(req,{error:'此網站只供試測，不能接收正式研究資料。'},400);
   try{
-    const study=createStudyServer(()=>env);
+    const study=studyServer(env);
     const value=path==='/api/study/start'?await study.allocate(body):path==='/api/study/submit'?await study.submit(body):await study.enterDraw(body);return json(req,value);
   }catch(error){const message=error instanceof Error?error.message:'';
     return /[\u3400-\u9fff]/.test(message)?json(req,{error:message},400):json(req,{error:'研究服務暫時無法儲存，請稍後再試。'},503);}

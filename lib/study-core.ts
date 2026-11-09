@@ -1,6 +1,13 @@
 import {makePlan,validateSubmission,PROTOCOL,CONSENT,STIMULI,FAMILIES,normalizePhone,csv} from '../docs/modules/protocol.mjs';
 
-export type StudyBindings = {DB:D1Database;BUCKET:R2Bucket;DRAW_SECRET?:string};
+// The draw uses only these storage operations. Original Sites can retain R2;
+// independent hosting supplies a separate D1 contact database through an adapter.
+export interface StudyContactStore {
+ put(key:string,value:string,options?:{onlyIf?:{etagDoesNotMatch:string};httpMetadata?:{contentType?:string}}):Promise<unknown|null>;
+ get(key:string):Promise<{json():Promise<unknown>}|null>;
+ list(options?:{prefix?:string;cursor?:string;limit?:number}):Promise<{objects:{key:string}[];truncated:boolean;cursor?:string}>;
+}
+export type StudyBindings = {DB:D1Database;BUCKET:StudyContactStore;DRAW_SECRET?:string};
 export const mode=(x:unknown)=>x==='pilot'?'pilot':'live';
 export const storageMode=(x:unknown)=>mode(x)+':'+PROTOCOL;
 export async function hash(value:string){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');}

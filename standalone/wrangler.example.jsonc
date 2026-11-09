@@ -8,8 +8,12 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "psyc-thesis-research",
-    "database_id": "REPLACE_WITH_REAL_D1_DATABASE_ID",
+    "database_id": "REPLACE_WITH_REAL_RESEARCH_D1_DATABASE_ID",
     "migrations_dir": "migrations"
-  }],
-  "r2_buckets": [{"binding":"BUCKET","bucket_name":"psyc-thesis-draw"}]
+  }, {
+    "binding": "CONTACTS_DB",
+    "database_name": "psyc-thesis-draw",
+    "database_id": "REPLACE_WITH_REAL_CONTACTS_D1_DATABASE_ID",
+    "migrations_dir": "contact-migrations"
+  }]
 }
