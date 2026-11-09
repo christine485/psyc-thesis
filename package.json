@@ -12,7 +12,7 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "study:build": "npm ci --prefix standalone --no-audit --no-fund && npm --prefix standalone run typecheck && npm --prefix standalone test && node tests/protocol.test.mjs",
+    "study:build": "npm ci --prefix standalone --no-audit --no-fund && npm --prefix standalone run typecheck && npm --prefix standalone test && node tests/protocol.test.mjs && node tests/image-loader.test.mjs",
     "study:deploy": "node scripts/deploy-cloudflare-staging.mjs",
     "build-study": "npm run study:build",
     "deploy-study": "npm run study:deploy"

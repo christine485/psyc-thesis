@@ -1,9 +1,11 @@
 import {PROTOCOL,CONSENT,TOTAL,SCALE,EDUCATION,parseWords,ratingWords,normalizePhone,makePlan} from './modules/protocol.mjs?v=hk-formal-20261104';
+import {watchStimulus} from './modules/image-loader.mjs';
 import {API_BASE,STIMULUS_BASE} from './config.js?v=hk-backend-20261106';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
 const root=document.querySelector('#app'),query=new URLSearchParams(location.search);
 const stimulusURL=file=>STIMULUS_BASE+file;
 const mode=query.get('mode')==='pilot'?'pilot':'live',preview=query.get('preview')==='1';
 const state={page:'consent',plan:null,index:0,phase:'naming',freeText:'',words:[],ratings:{},responses:[],loaded:false,busy:false,error:'',paused:false,t0:0,namingMs:0,pauseAt:0,token:crypto.randomUUID(),drawNonce:crypto.randomUUID(),researchDone:false,drawPermit:null,eligible:null,drawChoice:'no',phone:'',drawDone:false,demographics:{gender:'',age:'',education:''}};
+let disposeImage=()=>{};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const banner=()=>preview?'<div class="test-banner">預覽模式：不會提交研究資料或登記抽獎。</div>':mode==='pilot'?'<div class="test-banner">試測模式：答案會與正式研究資料分開儲存。</div>':'';
 const trial=()=>state.plan?.trials[state.index];
@@ -11,6 +13,7 @@ async function post(route,body){const r=await fetch(API_BASE+route,{method:'POST
 function setError(message){state.error=message;const e=document.querySelector('#error');if(e){e.textContent=message;e.hidden=!message;}}
 function jump(page){state.page=page;state.error='';render();window.scrollTo(0,0);document.querySelector('h1')?.focus();}
 function render(){
+ disposeImage();disposeImage=()=>{};
  let html=banner();
  if(state.page==='consent')html+='<div class="eyebrow">研究參與邀請</div><h1 tabindex="-1">圖案、情緒與你的感受</h1><p class="lede">請先閱讀以下資料，再決定是否參與。</p><div class="facts"><span>年滿18歲</span><span>27張主圖＋1次注意力測試</span><span>預計約15分鐘</span></div><section class="card"><h2>研究資料及參與同意書</h2><p class="study-title">'+TITLE+'</p><div class="contacts">'+contacts+'</div><div class="document">'+CONSENT_HTML+'</div><div class="note">參與完全自願。在最後提交前，你可關閉此頁退出。</div><button id="consent" class="primary consent-button" '+(state.busy?'disabled':'')+'>'+CONFIRM+'</button></section>';
  if(state.page==='trials'){
@@ -18,7 +21,7 @@ function render(){
   html+='<div class="trial-header"><div><div class="eyebrow">圖像與感受</div><h1 tabindex="-1">第 '+(state.index+1)+' ／ '+state.plan.total+' 張</h1></div><button id="pause" class="text-button">'+(state.paused?'繼續作答':'稍作休息')+'</button></div><div class="progress" role="progressbar" aria-label="研究進度" aria-valuemin="0" aria-valuemax="'+state.plan.total+'" aria-valuenow="'+state.index+'"><div style="width:'+state.index/state.plan.total*100+'%"></div></div>';
   if(state.paused)html+='<section class="card"><h2>請按自己的步調休息</h2><p>請保留此頁開啟，準備好時按「繼續作答」。</p><button id="resume" class="primary">繼續作答</button></section>';
   else{
-   html+='<section class="card image-card"><div class="image-wrap"><img id="stimulus" src="'+stimulusURL(t.stimulus)+'" alt="本次試驗的抽象灰階圖案" style="visibility:hidden"><div id="image-status" class="image-status" role="status">正在載入圖片…</div></div><p class="caption">請觀看圖案，按你自己的感受作答。</p></section>';
+   html+='<section class="card image-card"><div class="image-wrap"><img id="stimulus" alt="本次試驗的抽象灰階圖案" style="visibility:hidden"><div id="image-status" class="image-status" role="status">正在載入圖片…</div></div><p class="caption">請觀看圖案，按你自己的感受作答。</p></section>';
    if(state.phase==='naming')html+='<section class="card"><h2 class="question">'+(attention?'這是注意力測試。請在下方輸入「2」。':'觀看這幅圖像時，你產生了甚麼情緒？請輸入一至三個情緒詞語。')+'</h2><label class="form-label" for="free-text">'+(attention?'請輸入「2」':'你的答案')+'</label><textarea id="free-text" maxlength="120" autocomplete="off" spellcheck="false" aria-describedby="naming-help">'+esc(state.freeText)+'</textarea><p id="naming-help" class="help">'+(attention?'本試次請只輸入數字2；下一步的每項評分也請選擇2。':'多於一個詞時，請用頓號、逗號或空格分隔。沒有明顯情緒亦可照實填寫。請勿輸入個人資料。')+'</p><div class="actions"><span class="help">請先填寫，再繼續。</span><button id="name-next" class="primary" disabled>繼續</button></div></section>';
    else html+='<section class="card"><h2 class="question">'+(attention?'本試次請在每一項評分選擇「2」。':'以下詞語與這個圖案所呈現的視覺印象有多配合？')+'</h2><p class="help">'+(attention?'請為下列每一項選擇2。':'請為每個詞語選擇一個答案。請按詞語與圖像的配合程度評分。')+'</p>'+(state.words.length?'<div class="scale-legend">'+SCALE.map((s,i)=>'<div><b>'+String(i+1)+'</b>'+s+'</div>').join('')+'</div>'+state.words.map((w,j)=>'<div class="rating-row" role="group" aria-labelledby="rating-word-'+j+'"><span class="rating-word" id="rating-word-'+j+'">'+w+'</span>'+SCALE.map((s,i)=>'<label class="circle"><input type="radio" name="rating-'+j+'" data-word="'+esc(w)+'" value="'+(i+1)+'" aria-label="'+w+'：'+(i+1)+'，'+s+'" '+(state.ratings[w]===i+1?'checked':'')+'></label>').join('')+'</div>').join(''):'<div class="note">本次輸入已保留。請繼續觀看下一張圖像。</div>')+'<div class="actions"><span id="rating-count" class="help">'+Object.keys(state.ratings).length+' ／ '+state.words.length+' 項已完成</span><button id="trial-next" class="primary" disabled>'+(state.index===state.plan.total-1?'填寫背景資料':'下一張')+'</button></div></section>';
   }
@@ -29,7 +32,14 @@ function render(){
  root.innerHTML=html+'<div id="error" class="error" role="alert" '+(state.error?'':'hidden')+'>'+esc(state.error)+'</div>';
  bind();if(state.page==='trials'&&!state.paused)watchImage();
 }
-function watchImage(){state.loaded=false;const image=document.querySelector('#stimulus');if(!image)return;const onLoad=()=>{if(!image.isConnected)return;state.loaded=true;image.style.visibility='visible';document.querySelector('#image-status').hidden=true;if(!state.t0)state.t0=performance.now();updateButtons();};image.addEventListener('load',onLoad);image.addEventListener('error',()=>{if(!image.isConnected)return;state.loaded=false;const status=document.querySelector('#image-status');status.innerHTML='<span>圖片未能載入，請重試。</span><button id="retry-image" class="secondary">重新載入圖片</button>';status.hidden=false;document.querySelector('#retry-image').onclick=()=>{status.textContent='正在重新載入…';image.src=stimulusURL(trial().stimulus)+'?retry='+Date.now();};updateButtons();});if(image.complete&&image.naturalWidth)onLoad();}
+function watchImage(){
+ state.loaded=false;const image=document.querySelector('#stimulus'),status=document.querySelector('#image-status');if(!image||!status)return;
+ const watcher=watchStimulus(image,stimulusURL(trial().stimulus),{
+  onReady:()=>{state.loaded=true;image.style.visibility='visible';status.hidden=true;if(!state.t0)state.t0=performance.now();updateButtons();},
+  onFailure:()=>{state.loaded=false;image.style.visibility='hidden';status.innerHTML='<span>圖片未能載入，請重試。你已填寫的答案會保留。</span><button id="retry-image" class="secondary">重新載入圖片</button>';status.hidden=false;document.querySelector('#retry-image').onclick=()=>{state.loaded=false;image.style.visibility='hidden';status.textContent='正在重新載入…';status.hidden=false;watcher.retry();updateButtons();};updateButtons();}
+ });
+ disposeImage=watcher.dispose;
+}
 function updateButtons(){const naming=document.querySelector('#name-next');if(naming){let valid=false;try{parseWords(document.querySelector('#free-text').value);valid=true;}catch{}naming.disabled=!state.loaded||!valid||state.busy;}const next=document.querySelector('#trial-next');if(next)next.disabled=!state.loaded||!state.words.every(w=>Number.isInteger(state.ratings[w]));const count=document.querySelector('#rating-count');if(count)count.textContent=Object.keys(state.ratings).length+' ／ '+state.words.length+' 項已完成';}
 function bind(){
  document.querySelector('#consent')?.addEventListener('click',begin);

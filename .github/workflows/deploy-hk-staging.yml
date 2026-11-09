@@ -33,6 +33,7 @@ jobs:
           npm --prefix standalone test
           npm --prefix standalone run typecheck
           node tests/protocol.test.mjs
+          node tests/image-loader.test.mjs
           node tests/server.test.mjs
           node tests/migration.test.mjs
           node tests/staging-deploy.test.mjs
