@@ -1,19 +1,23 @@
-import {PROTOCOL,CONSENT,TOTAL,SCALE,EDUCATION,parseWords,ratingWords,normalizePhone,makePlan} from './modules/protocol.mjs?v=hk-formal-20261104';
-import {watchStimulus} from './modules/image-loader.mjs';
+import {PROTOCOL,CONSENT,TOTAL,SCALE,EDUCATION,parseWords,ratingWords,normalizePhone,makePlan} from './modules/protocol.mjs?v=hk-speed-20261109';
+import {watchStimulus} from './modules/image-loader.mjs?v=hk-speed-20261109';
+import {createStimulusPool} from './modules/image-preload.mjs?v=hk-speed-20261109';
+import {postStudy} from './modules/study-request.mjs?v=hk-speed-20261109';
 import {API_BASE,STIMULUS_BASE} from './config.js?v=hk-backend-20261106';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
 const root=document.querySelector('#app'),query=new URLSearchParams(location.search);
 const stimulusURL=file=>STIMULUS_BASE+file;
 const mode=query.get('mode')==='pilot'?'pilot':'live',preview=query.get('preview')==='1';
 const state={page:'consent',plan:null,index:0,phase:'naming',freeText:'',words:[],ratings:{},responses:[],loaded:false,busy:false,error:'',paused:false,t0:0,namingMs:0,pauseAt:0,token:crypto.randomUUID(),drawNonce:crypto.randomUUID(),researchDone:false,drawPermit:null,eligible:null,drawChoice:'no',phone:'',drawDone:false,demographics:{gender:'',age:'',education:''}};
 let disposeImage=()=>{};
+const stimulusPool=createStimulusPool();
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const banner=()=>preview?'<div class="test-banner">預覽模式：不會提交研究資料或登記抽獎。</div>':mode==='pilot'?'<div class="test-banner">試測模式：答案會與正式研究資料分開儲存。</div>':'';
 const trial=()=>state.plan?.trials[state.index];
-async function post(route,body){const r=await fetch(API_BASE+route,{method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{throw Error('暫時無法連接研究服務。你的未提交答案仍在本頁，請稍後重試，勿重新整理。');});let value;try{value=await r.json();}catch{throw Error('暫時無法連接研究服務。你的未提交答案仍在本頁，請稍後重試，勿重新整理。');}if(!r.ok)throw Error(value.error||'未能提交，請重試。');return value;}
+function post(route,body){return postStudy(API_BASE,route,body);}
 function setError(message){state.error=message;const e=document.querySelector('#error');if(e){e.textContent=message;e.hidden=!message;}}
 function jump(page){state.page=page;state.error='';render();window.scrollTo(0,0);document.querySelector('h1')?.focus();}
 function render(){
  disposeImage();disposeImage=()=>{};
+ if(state.page!=='trials')stimulusPool.clear();
  let html=banner();
  if(state.page==='consent')html+='<div class="eyebrow">研究參與邀請</div><h1 tabindex="-1">圖案、情緒與你的感受</h1><p class="lede">請先閱讀以下資料，再決定是否參與。</p><div class="facts"><span>年滿18歲</span><span>27張主圖＋1次注意力測試</span><span>預計約15分鐘</span></div><section class="card"><h2>研究資料及參與同意書</h2><p class="study-title">'+TITLE+'</p><div class="contacts">'+contacts+'</div><div class="document">'+CONSENT_HTML+'</div><div class="note">參與完全自願。在最後提交前，你可關閉此頁退出。</div><button id="consent" class="primary consent-button" '+(state.busy?'disabled':'')+'>'+CONFIRM+'</button></section>';
  if(state.page==='trials'){
@@ -33,9 +37,11 @@ function render(){
  bind();if(state.page==='trials'&&!state.paused)watchImage();
 }
 function watchImage(){
- state.loaded=false;const image=document.querySelector('#stimulus'),status=document.querySelector('#image-status');if(!image||!status)return;
+ state.loaded=false;const placeholder=document.querySelector('#stimulus'),status=document.querySelector('#image-status');if(!placeholder||!status)return;
+ const image=stimulusPool.current(stimulusURL(trial().stimulus));
+ image.id='stimulus';image.alt=placeholder.alt;image.style.visibility='hidden';placeholder.replaceWith(image);
  const watcher=watchStimulus(image,stimulusURL(trial().stimulus),{
-  onReady:()=>{state.loaded=true;image.style.visibility='visible';status.hidden=true;if(!state.t0)state.t0=performance.now();updateButtons();},
+  onReady:()=>{state.loaded=true;image.style.visibility='visible';status.hidden=true;if(!state.t0)state.t0=performance.now();updateButtons();preload();},
   onFailure:()=>{state.loaded=false;image.style.visibility='hidden';status.innerHTML='<span>圖片未能載入，請重試。你已填寫的答案會保留。</span><button id="retry-image" class="secondary">重新載入圖片</button>';status.hidden=false;document.querySelector('#retry-image').onclick=()=>{state.loaded=false;image.style.visibility='hidden';status.textContent='正在重新載入…';status.hidden=false;watcher.retry();updateButtons();};updateButtons();}
  });
  disposeImage=watcher.dispose;
@@ -53,9 +59,9 @@ function bind(){
  document.querySelector('#phone')?.addEventListener('input',e=>{state.phone=e.target.value;});
  document.querySelector('#finish')?.addEventListener('submit',e=>{e.preventDefault();finish();});
 }
-async function begin(){if(state.busy)return;state.busy=true;setError('');render();try{if(preview){state.plan={...makePlan(0,state.token,'pilot'),rowSeed:state.token};}else state.plan=await post('/api/study/start',{token:state.token,mode,consented:true,protocol:PROTOCOL,consent:CONSENT});state.index=0;state.t0=0;state.busy=false;jump('trials');preload();}catch(e){state.busy=false;state.error=e.message;render();}}
-function preload(){for(const t of state.plan.trials.slice(state.index+1,state.index+3)){const img=new Image();img.src=stimulusURL(t.stimulus);}}
-function nextTrial(){if(state.page!=='trials'||state.phase!=='rating'||!state.loaded||!state.words.every(w=>Number.isInteger(state.ratings[w])))return;const box=document.querySelector('#stimulus').getBoundingClientRect();state.responses.push({type:trial().type,stimulus:trial().stimulus,freeText:state.freeText,ratings:{...state.ratings},durationMs:performance.now()-state.t0,namingMs:state.namingMs,width:box.width,height:box.height});state.freeText='';state.words=[];state.ratings={};state.phase='naming';state.t0=0;state.namingMs=0;if(state.index===state.plan.total-1)jump('demographics');else{state.index++;jump('trials');preload();}}
+async function begin(){if(state.busy)return;state.busy=true;setError('');render();try{if(preview){state.plan={...makePlan(0,state.token,'pilot'),rowSeed:state.token};}else state.plan=await post('/api/study/start',{token:state.token,mode,consented:true,protocol:PROTOCOL,consent:CONSENT});state.index=0;state.t0=0;state.busy=false;jump('trials');}catch(e){state.busy=false;state.error=e.message;render();}}
+function preload(){stimulusPool.preload(state.plan.trials.slice(state.index,state.index+3).map(t=>stimulusURL(t.stimulus)));}
+function nextTrial(){if(state.page!=='trials'||state.phase!=='rating'||!state.loaded||!state.words.every(w=>Number.isInteger(state.ratings[w])))return;const box=document.querySelector('#stimulus').getBoundingClientRect();state.responses.push({type:trial().type,stimulus:trial().stimulus,freeText:state.freeText,ratings:{...state.ratings},durationMs:performance.now()-state.t0,namingMs:state.namingMs,width:box.width,height:box.height});state.freeText='';state.words=[];state.ratings={};state.phase='naming';state.t0=0;state.namingMs=0;if(state.index===state.plan.total-1)jump('demographics');else{state.index++;jump('trials');}}
 function pause(){if(state.paused){state.t0+=performance.now()-state.pauseAt;state.paused=false;}else{if(!state.loaded)return;state.pauseAt=performance.now();state.paused=true;}render();}
 async function finish(){
  if(state.busy)return;if(state.drawChoice==='yes'&&!normalizePhone(state.phone)){setError('抽獎只接受香港電話號碼，請輸入8位數字或＋852及8位數字。');return;}
