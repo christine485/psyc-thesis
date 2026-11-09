@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "engines": {"node": ">=24.0.0"},
-  "scripts": {"test": "node browser-flow.mjs"},
+  "scripts": {"test": "node browser-flow.mjs", "test:researcher": "node researcher-flow.mjs"},
   "devDependencies": {"playwright-core": "1.56.1"}
 }

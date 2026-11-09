@@ -10,7 +10,7 @@
     "dev": "wrangler dev --config wrangler.jsonc",
     "deploy": "wrangler deploy --config wrangler.jsonc",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node tests/contact-store.test.mjs && node tests/worker.test.mjs && node tests/capacity-150.test.mjs"
+    "test": "node tests/contact-store.test.mjs && node tests/worker.test.mjs && node tests/export-pages.test.mjs && node tests/capacity-150.test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260515.1",

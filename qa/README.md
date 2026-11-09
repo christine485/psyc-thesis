@@ -23,3 +23,10 @@ all 270 original PNGs in each engine. Reports and screenshots go under ignored
 
 These are automated Linux browser-engine and viewport tests, not a substitute
 for real-device Safari/Chrome and Hong Kong Wi-Fi/mobile-network acceptance.
+
+Run `node qa/researcher-flow.mjs --engine=chromium` (or `firefox`, `webkit`)
+to check the researcher page against isolated local data. This verifies denied
+unauthenticated access, exact CSV bytes and modes, separate phone exports,
+cancelled downloads on logout, credential cleanup, and the blocked GitHub Pages
+copy of the sign-in form. It uses the same local Playwright overrides above and
+never reads production answers or credentials.

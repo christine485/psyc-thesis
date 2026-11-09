@@ -1,4 +1,5 @@
 import type {StudyContactStore} from '../../lib/study-core.ts';
+import {csv} from '../../docs/modules/protocol.mjs';
 
 function prefixUpperBound(prefix:string):string|null {
   const characters=Array.from(prefix);
@@ -11,6 +12,18 @@ function prefixUpperBound(prefix:string):string|null {
     characters.pop();
   }
   return null;
+}
+
+// The D1 adapter can read the phone values in one indexed query instead of
+// issuing one lookup per contact, which would exhaust Free invocation limits.
+// Original Sites/R2 exports continue using the shared core's storage adapter.
+export async function exportDrawCSV(database:D1Database,mode:string):Promise<string> {
+  if(mode!=='pilot'&&mode!=='live')throw Error('Invalid draw export mode');
+  const prefix=mode+'/phones/',upper=prefixUpperBound(prefix)!;
+  const result=await database.prepare('SELECT value FROM contact_objects WHERE key>=? AND key<? ORDER BY key').bind(prefix,upper).all<{value:string}>();
+  const rows:unknown[][]=[['phone']];
+  for(const object of result.results){const value=JSON.parse(object.value);if(value)rows.push([value.phone]);}
+  return csv(rows);
 }
 
 // This database is separate from research answers. Keys and JSON stay identical
