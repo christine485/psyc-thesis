@@ -30,7 +30,7 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://'+req.headers.host);
   if(url.pathname.startsWith('/api/')){const response=await fetchHandler(new Request(url,{method:req.method,headers:req.headers}),env);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;}
   const name=url.pathname==='/researcher'?'researcher.html':path.basename(url.pathname);
-  assert.ok(['researcher.html','researcher.js','researcher.css'].includes(name));
+  assert.ok(['researcher.html','researcher.js','researcher.css','config.js'].includes(name));
   res.setHeader('Content-Type',name.endsWith('.html')?'text/html':name.endsWith('.css')?'text/css':'text/javascript');
   res.setHeader('Cache-Control','no-store');if(name.endsWith('.html'))res.setHeader('Content-Security-Policy',policy);
   res.end(await fs.readFile(path.join(ROOT,'docs',name)));
@@ -54,6 +54,12 @@ try{
  assert.equal(await page.locator('#dashboard').isVisible(),false);
  async function login(){await page.locator('#admin-token').fill(secret);await page.locator('#login').click();await page.locator('#dashboard').waitFor();}
  await login();assert.equal(await page.locator('#submitted').textContent(),'1');
+ await page.waitForFunction(()=>document.querySelectorAll('#coverage-body tr').length===270);
+ assert.equal(await page.locator('#coverage-range').textContent(),'0–1');
+ assert.equal(await page.locator('#coverage-zero').textContent(),'243 ／ 270');
+ await page.locator('#coverage-panel details').evaluate(node=>node.open=true);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Coverage table overflowed the mobile page');
+ await page.locator('#coverage-panel details').evaluate(node=>node.open=false);
  assert.equal(await page.locator('#admin-token').inputValue(),'');assert.equal(await page.locator('#generated-key').inputValue(),'');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  for(const [mode,kind] of [['pilot','research'],['pilot','draw'],['live','research']]){
@@ -63,6 +69,11 @@ try{
   const bytes=await fs.readFile(await result.path());
   assert.equal(bytes.toString(),await(kind==='draw'?core.drawCSV(mode):core.researchCSV(mode)),'Browser CSV changed source data');
  }
+ const coverageDownload=page.waitForEvent('download');await page.locator('#download-coverage').click();const coverageFile=await coverageDownload;
+ assert.equal(coverageFile.suggestedFilename(),'live-image-coverage.csv');
+ const coverageCSV=await fs.readFile(await coverageFile.path(),'utf8');
+ assert.ok(coverageCSV.startsWith('\uFEFF"stimulus","condition","assessments","valid_assessments","word_ratings"'));
+ assert.equal(coverageCSV.split('\r\n').length,271);assert.ok(!coverageCSV.includes('+852'));
  // A late authenticated response must not revive a signed-out session or export.
  let release,started;const gate=new Promise(resolve=>started=resolve);
  await page.route('**/api/admin/export?**',async route=>{if(new URL(route.request().url()).searchParams.has('slot')){release=route;started();return;}await route.continue();});
@@ -70,16 +81,51 @@ try{
  await release.fulfill({status:200,contentType:'text/csv',body:await core.researchCSV('live')}).catch(()=>{});
  await page.waitForTimeout(100);
  assert.equal(await page.locator('#dashboard').isVisible(),false);assert.equal(await page.locator('#download-links a').count(),0);
+ assert.equal(await page.locator('#coverage-body tr').count(),0);
  assert.deepEqual(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length})),{local:0,session:0});
  assert.deepEqual(await context.cookies(),[]);
  await page.unroute('**/api/admin/export?**');await login();await page.reload();await page.locator('#login').waitFor();assert.equal(await page.locator('#dashboard').isVisible(),false);
  assert.ok(requests.every(request=>!request.url.includes(secret)),'A credential reached a URL');
  assert.ok(requests.filter(request=>request.authorization).every(request=>request.url.startsWith(origin+'/api/admin/')),'A credential reached another resource');
  assert.deepEqual(errors,[]);
- // The copy hosted by GitHub Pages must never accept or send the admin secret.
- const wrong=await context.newPage();let wrongApiCalls=0;
- await wrong.route('**/*',async route=>{const url=new URL(route.request().url());if(url.pathname.includes('/api/'))wrongApiCalls++;const name=path.basename(url.pathname);if(!['researcher.html','researcher.js','researcher.css'].includes(name))return route.abort();await route.fulfill({status:200,contentType:name.endsWith('.html')?'text/html':name.endsWith('.css')?'text/css':'text/javascript',body:await fs.readFile(path.join(ROOT,'docs',name))});});
- await wrong.goto('https://christine485.github.io/psyc-thesis/researcher.html');await wrong.locator('#wrong-host').waitFor();assert.equal(wrongApiCalls,0);assert.equal(await wrong.locator('#admin-token').isDisabled(),true);
+ // GitHub may accept credentials only after the exact formal backend is configured.
+ const githubOrigin='https://christine485.github.io',formalOrigin='https://psyc-thesis-api.christine040805.workers.dev';
+ async function githubPage(configuredAPI){
+  const github=await context.newPage(),apiRequests=[],credentialRequests=[];let preflights=0;
+  await github.route('**/*',async route=>{
+   const request=route.request(),url=new URL(request.url());
+   if(url.pathname.startsWith('/api/')){
+    apiRequests.push(request.url());assert.equal(url.origin,formalOrigin,'A configured credential API must use the exact formal origin');
+    if(request.headers().authorization)credentialRequests.push(request.url());
+    if(request.method()==='OPTIONS')preflights++;
+    const response=await fetchHandler(new Request(request.url(),{method:request.method(),headers:request.headers()}),{...env,STAGING_ONLY:'0'});
+    await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())});return;
+   }
+   assert.equal(url.origin,githubOrigin,'Frontend assets must remain on the website');
+   const name=path.basename(url.pathname);if(!['researcher.html','researcher.js','researcher.css','config.js'].includes(name))return route.abort();
+   const body=name==='config.js'?Buffer.from('export const API_BASE='+JSON.stringify(configuredAPI)+';'):await fs.readFile(path.join(ROOT,'docs',name));
+   await route.fulfill({status:200,contentType:name.endsWith('.html')?'text/html':name.endsWith('.css')?'text/css':'text/javascript',body});
+  });
+  await github.goto(githubOrigin+'/psyc-thesis/researcher.html');
+  return {page:github,apiRequests,credentialRequests,getPreflights:()=>preflights};
+ }
+ for(const oldOrUntrusted of ['https://cloud-flow-emotion-study.christine040805.chatgpt.site','https://psyc-thesis-hk-staging-api.christine040805.workers.dev','https://psyc-thesis-api.someone-else.workers.dev',formalOrigin+'/wrong-path',formalOrigin+'/?unexpected=1']){
+  const blocked=await githubPage(oldOrUntrusted);await blocked.page.locator('#wrong-host').waitFor();assert.equal(blocked.apiRequests.length,0);assert.equal(await blocked.page.locator('#admin-token').isDisabled(),true);assert.equal(await blocked.page.locator('#generate-key').isDisabled(),true);await blocked.page.close();
+ }
+ const configured=await githubPage(formalOrigin);await configured.page.locator('#admin-token:enabled').waitFor();
+ await configured.page.locator('#admin-token').fill(secret);await configured.page.locator('#login').click();await configured.page.locator('#dashboard').waitFor();
+ await configured.page.waitForFunction(()=>document.querySelectorAll('#coverage-body tr').length===270);
+ assert.equal(await configured.page.locator('#mode').inputValue(),'live');
+ const ghDownload=configured.page.waitForEvent('download');await configured.page.locator('#download-research').click();const ghCSV=await ghDownload;
+ assert.equal(ghCSV.suggestedFilename(),'live-research.csv');assert.equal((await fs.readFile(await ghCSV.path())).toString(),await core.researchCSV('live'));
+ // Request interception can fulfil a CORS request before a browser sends its
+ // network OPTIONS. Verify the same real Worker preflight handler explicitly.
+ const preflight=await fetchHandler(new Request(formalOrigin+'/api/admin/status',{method:'OPTIONS',headers:{Origin:githubOrigin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization'}}),{...env,STAGING_ONLY:'0'});
+ assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),githubOrigin);
+ assert.ok((preflight.headers.get('Access-Control-Allow-Headers')||'').toLowerCase().split(',').map(value=>value.trim()).includes('authorization'));
+ assert.ok((preflight.headers.get('Access-Control-Allow-Methods')||'').split(',').map(value=>value.trim()).includes('GET'));
+ assert.ok(configured.credentialRequests.length>0);assert.ok(configured.credentialRequests.every(url=>url.startsWith(formalOrigin+'/api/admin/')),'A credential reached GitHub Pages or another host');
+ await configured.page.locator('#logout').click();assert.equal(await configured.page.locator('#coverage-body tr').count(),0);
  await context.close();
- console.log(JSON.stringify({ok:true,engine,version:browser.version(),researchAndDrawDownloads:true,csvBytesPreserved:true,modeIsolation:true,unauthenticatedDenied:true,logoutCancelsExport:true,noStoredCredentials:true,githubCredentialEntryBlocked:true,productionWrites:0}));
+ console.log(JSON.stringify({ok:true,engine,version:browser.version(),researchAndDrawDownloads:true,csvBytesPreserved:true,modeIsolation:true,coverageVisible:true,unauthenticatedDenied:true,logoutCancelsExport:true,noStoredCredentials:true,unconfirmedGithubCredentialEntryBlocked:true,configuredGithubResearcherWorks:true,corsPreflightVerified:true,interceptedPreflights:configured.getPreflights(),productionWrites:0}));
 }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));research.sqlite.close();contacts.sqlite.close();}

@@ -100,7 +100,7 @@ test('empty research snapshots carry the exact header without using a bulk expor
  }finally{f.close();}
 });
 
-test('the index and individual exports require authorization, same origin and valid slot IDs',async()=>{
+test('the index and individual exports require authorization, trusted origins and valid slot IDs',async()=>{
  const f=fixture();
  try{
   let reads=0;const original=f.env.DB;
@@ -108,11 +108,11 @@ test('the index and individual exports require authorization, same origin and va
   for(const route of ['/api/admin/export-index?mode=pilot','/api/admin/export?mode=pilot&kind=research&slot=0']){
    assert.equal((await fetchHandler(new Request(origin+route),f.env)).status,403);
    assert.equal((await f.api(route,{Authorization:'Bearer wrong-token'})).status,403);
-   assert.equal((await f.api(route,{Origin:'https://christine485.github.io'})).status,403);
    assert.equal((await f.api(route,{Origin:'https://untrusted.example'})).status,403);
    const method=await fetchHandler(new Request(origin+route,{method:'POST',headers:{Authorization:'Bearer '+f.env.ADMIN_TOKEN}}),f.env);assert.equal(method.status,405);
   }
   assert.equal(reads,0,'Denied exports must never read the research database');
+  assert.equal((await f.api('/api/admin/export-index?mode=pilot',{Origin:'https://christine485.github.io'})).status,200);
   assert.equal((await f.api('/api/admin/export-index?mode=pilot',{Origin:origin})).status,200);
   for(const route of ['/api/admin/export-index','/api/admin/export-index?mode=typo','/api/admin/export?mode=pilot&kind=draw&slot=0','/api/admin/export?mode=pilot&kind=research&slot=0&slot=1'])assert.equal((await f.api(route)).status,400);
   for(const slot of ['', '-1','-0','01','1.5','1e2','Infinity','NaN','9007199254740992','0%20OR%201=1'])assert.equal((await f.api('/api/admin/export?mode=pilot&kind=research&slot='+slot)).status,400);
