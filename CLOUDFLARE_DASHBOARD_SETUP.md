@@ -4,6 +4,8 @@
 
 本階段建立獨立試測網站，保留正式 GitHub Pages 的研究 API 設定。圖片及研究流程與正式版本一致；試測網站強制 pilot 模式，拒絕正式模式的答案。
 
+**只使用 Workers Free 與 D1 Free：不開通 R2、不購買網域、不選擇 Workers Paid。** 研究答案與抽獎電話各使用一個獨立 D1。免費額度有上限，不能當作無限服務；D1 Free 超出日限額會拒絕查詢，不會自動升級付費。[官方說明](https://developers.cloudflare.com/d1/platform/pricing/#what-happens-if-i-exceed-the-daily-limits-on-reads-and-writes-or-the-total-storage-limit-on-the-free-plan)
+
 ## 畫面填寫內容
 
 | 畫面欄位 | 填寫內容 |
@@ -20,22 +22,22 @@
 
 Node.js 版本由程式庫的 `.nvmrc` 指定為 24。程式已放在 `main` 後，可使用初始畫面預設的主分支；日後在 Worker → Settings → Build → Branch control 核對。
 
-展開 token 權限說明，確認至少包括 Account Settings Read、Workers Scripts Edit、D1 Storage Edit／D1 Edit，以及 Workers R2 Storage Edit。2026-11-07 使用者提供的建立畫面已顯示 D1 Storage（edit）及 R2（edit）；不能只憑舊版文件假定權限清單。
+展開 token 權限說明，確認至少包括 Account Settings Read、Workers Scripts Edit，以及 D1 Storage Edit／D1 Edit。使用者提供的建立畫面已顯示所需權限；自動 token 即使列出 R2 權限，部署程式也不會呼叫 R2 或開通訂閱。
 
 ## 部署前的帳戶設定
 
-新帳戶需完成 Workers & Pages 設定，具備 `workers.dev` 子網域；亦需啟用 R2 Object Storage。R2 可能要求付款方式，請按官方畫面的費用與條款決定；部署程式不會代為開通訂閱。
+新帳戶需完成 Workers & Pages 設定，具備 `workers.dev` 子網域，並保持 Workers Free。這個版本不需要 R2 訂閱；如果正停留在「Add R2 subscription」畫面，返回原本建立 Worker 的分頁即可。程式沒有訂閱或升級方案的操作；實際帳戶方案仍以 Cloudflare 畫面為準。
 
 Cloudflare 的圖形介面會處理 token 授權。部署程式透過 Wrangler 的正常登入方式操作，不讀取或顯示 token、密碼、秘密檔案；只接受可明確識別的單一帳戶，或明確提供的 Account ID。若帳戶不明確，會停止而不猜選。
 
 ## 程式會做甚麼
 
 1. 核對指定試測 Worker 名稱及目前授權的帳戶。
-2. 建立或重用指定名稱的獨立 D1／R2，不刪除既有資源。
+2. 建立或重用兩個指定名稱、不同 ID 的 D1：研究答案 `psyc-thesis-hk-staging-research`、抽獎資料 `psyc-thesis-hk-staging-draw`，不刪除既有資源。
 3. 核對 270 張刺激圖片 SHA-256，產生只供試測的網站副本。
 4. 套用 schema、部署 Worker 與圖片，保留既有秘密值。
 5. 只在尚未設定時建立試測用簽署及管理秘密值，經 stdin 傳入，避免寫入日誌或程式碼。
-6. 使用 Wrangler 實際回傳的網址檢查研究版本與 D1／R2 健康狀態。
+6. 使用 Wrangler 實際回傳的網址檢查研究版本與兩個 D1 的健康狀態。
 
 成功部署及健康檢查不等於香港無 VPN 驗收。仍須以香港手機、Wi-Fi 及流動數據完成整份試測，並核對答案已保存，才處理正式資料搬遷及切換。完整流程見 [MIGRATION_HK.md](MIGRATION_HK.md)。
 

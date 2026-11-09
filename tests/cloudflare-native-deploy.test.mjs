@@ -3,18 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {deployCloudflareStaging,resolveAccount,parseBuckets,deploymentOrigin} from '../scripts/deploy-cloudflare-staging.mjs';
+import {deployCloudflareStaging,resolveAccount,deploymentOrigin} from '../scripts/deploy-cloudflare-staging.mjs';
 import {STAGING} from '../scripts/deploy-hk-staging.mjs';
 import {PROTOCOL} from '../docs/modules/protocol.mjs';
 
 const ACCOUNT='a'.repeat(32),OTHER_ACCOUNT='b'.repeat(32);
 const DB='01234567-89ab-cdef-0123-456789abcdef';
+const CONTACTS_DB='12345678-9abc-def0-1234-56789abcdef0';
 const ORIGIN='https://'+STAGING.worker+'.actual-build-account.workers.dev';
 const PRIVATE='synthetic-private-output-never-print';
 const healthy={ok:true,stagingOnly:true,configurationReady:true,storageReady:true,protocol:PROTOCOL,images:270};
 
-function harness({existing=false,secrets=[],accounts=[ACCOUNT],deployment=ORIGIN,health=healthy,r2Disabled=false,hideCreatedDatabase=false,hideCreatedBucket=false}={}){
- let dbExists=existing,bucketExists=existing,temp,config;
+function harness({existing=false,secrets=[],accounts=[ACCOUNT],deployment=ORIGIN,health=healthy,hideCreatedDatabase=false,hideCreatedContactsDatabase=false,sameDatabaseId=false,contactsMigrationFails=false}={}){
+ let dbExists=existing,contactsDbExists=existing,temp,config;
  const secretValues=new Map(secrets.map(name=>[name,'preserved-'+name]));
  const runs=[],reports=[],requests=[];
  const h={runs,reports,requests,secretValues,get temp(){return temp;},get config(){return config;},
@@ -33,30 +34,37 @@ function harness({existing=false,secrets=[],accounts=[ACCOUNT],deployment=ORIGIN
    assert.equal(Object.hasOwn(options.env,'CLOUDFLARE_API_TOKEN'),false,'Native build auth must not require a manually configured token.');
    assert.ok(!args.join(' ').includes(PRIVATE));
    assert.ok(!args.includes('delete'));
+   assert.ok(['whoami','d1','deploy','secret'].includes(args[0]),'Deployment must never activate other products or change subscriptions.');
    runs.push({args:[...args],input:options.input});
    if(args[0]==='whoami'){
     assert.deepEqual(args.slice(0,2),['whoami','--json']);
     return JSON.stringify({loggedIn:true,email:PRIVATE,accounts:accounts.map(id=>({id,name:'private-account-name'})),tokenPermissions:['metadata-only']});
    }
    assert.equal(options.env.CLOUDFLARE_ACCOUNT_ID,ACCOUNT);
-   if(args[0]==='r2'){
-    if(r2Disabled)throw Error(PRIVATE+' Billing must be enabled');
-    if(args[2]==='list')return '\u001b[32mListing buckets...\u001b[0m\n\nname:           production-draw\ncreation_date:  2026-01-01\n'+(bucketExists&&!hideCreatedBucket?'\nname:           '+STAGING.bucket+'\ncreation_date:  2026-11-06\n':'');
-    assert.deepEqual(args.slice(0,4),['r2','bucket','create',STAGING.bucket]);assert.ok(args.includes('--no-update-config'));
-    bucketExists=true;return 'Created bucket '+STAGING.bucket;
-   }
-   if(args[0]==='d1'&&args[1]==='list')return JSON.stringify([{name:'production-research',uuid:'fedcba98-7654-3210-fedc-ba9876543210'},...(dbExists&&!hideCreatedDatabase?[{name:STAGING.database,uuid:DB}]:[])]);
+   if(args[0]==='d1'&&args[1]==='list')return JSON.stringify([
+    {name:'production-research',uuid:'fedcba98-7654-3210-fedc-ba9876543210'},
+    ...(dbExists&&!hideCreatedDatabase?[{name:STAGING.database,uuid:DB}]:[]),
+    ...(contactsDbExists&&!hideCreatedContactsDatabase?[{name:STAGING.contactsDatabase,uuid:sameDatabaseId?DB.toUpperCase():CONTACTS_DB}]:[])
+   ]);
    if(args[0]==='d1'&&args[1]==='create'){
-    assert.equal(args[2],STAGING.database);assert.ok(args.includes('--no-update-config'));
-    dbExists=true;return 'Created '+STAGING.database;
+    assert.ok([STAGING.database,STAGING.contactsDatabase].includes(args[2]));assert.ok(args.includes('--no-update-config'));
+    if(args[2]===STAGING.database)dbExists=true;
+    else contactsDbExists=true;
+    return 'Created '+args[2];
    }
    config=cfg;
    assert.equal(cfg.account_id,ACCOUNT);assert.equal(cfg.vars.STAGING_ONLY,'1');
-   assert.equal(cfg.d1_databases[0].database_name,STAGING.database);assert.equal(cfg.d1_databases[0].database_id,DB);
-   assert.equal(cfg.r2_buckets[0].bucket_name,STAGING.bucket);
+   assert.deepEqual(cfg.d1_databases,[
+    {binding:'DB',database_name:STAGING.database,database_id:DB,migrations_dir:path.resolve('standalone/migrations')},
+    {binding:'CONTACTS_DB',database_name:STAGING.contactsDatabase,database_id:CONTACTS_DB,migrations_dir:path.resolve('standalone/contact-migrations')}
+   ]);
+   assert.equal(Object.hasOwn(cfg,'r2_buckets'),false);
    assert.deepEqual(cfg.assets.run_worker_first,['/api/*']);
    if(args[0]==='d1'){
-    assert.deepEqual(args.slice(0,5),['d1','migrations','apply',STAGING.database,'--remote']);return 'Migration applied';
+    assert.deepEqual(args.slice(0,3),['d1','migrations','apply']);
+    assert.ok([STAGING.database,STAGING.contactsDatabase].includes(args[3]));assert.equal(args[4],'--remote');
+    if(args[3]===STAGING.contactsDatabase&&contactsMigrationFails)throw Error(PRIVATE+' migration failure');
+    return 'Migration applied';
    }
    if(args[0]==='deploy'){
     assert.ok(args.includes('--keep-vars'),'Existing secrets must survive a repeat deployment.');
@@ -87,13 +95,14 @@ function harness({existing=false,secrets=[],accounts=[ACCOUNT],deployment=ORIGIN
  return h;
 }
 
-test('fresh native build uses inherited Wrangler auth, creates only exact staging resources and verifies actual URL/storage',async()=>{
+test('fresh native build creates isolated research/contact D1 databases, without activating paid products',async()=>{
  const h=harness();const result=await deployCloudflareStaging({env:{WRANGLER_CI_OVERRIDE_NAME:STAGING.worker},...h});
- assert.deepEqual(result,{url:ORIGIN+'/?mode=pilot',databaseId:DB,createdDatabase:true,createdBucket:true,productionChanged:false});
+ assert.deepEqual(result,{url:ORIGIN+'/?mode=pilot',databaseId:DB,contactsDatabaseId:CONTACTS_DB,createdDatabase:true,createdContactsDatabase:true,productionChanged:false});
  const commands=h.runs.map(run=>run.args.slice(0,3).join(' '));
- assert.ok(commands.indexOf('r2 bucket list')<commands.findIndex(command=>command.startsWith('d1 create')));
- assert.equal(commands.filter(command=>command==='d1 list --json').length,2,'Creation must be followed by authoritative D1 re-listing.');
- assert.equal(commands.filter(command=>command==='r2 bucket list').length,2,'Creation must be followed by authoritative R2 re-listing.');
+ assert.equal(commands.filter(command=>command==='d1 list --json').length,3,'Both creations must be followed by authoritative D1 re-listing.');
+ assert.deepEqual(h.runs.filter(run=>run.args[1]==='create').map(run=>run.args[2]),[STAGING.database,STAGING.contactsDatabase]);
+ assert.deepEqual(h.runs.filter(run=>run.args[1]==='migrations').map(run=>run.args[3]),[STAGING.database,STAGING.contactsDatabase]);
+ assert.ok(h.runs.findIndex(run=>run.args[0]==='deploy')>h.runs.findIndex(run=>run.args[1]==='migrations'&&run.args[3]===STAGING.contactsDatabase));
  assert.equal(h.runs.filter(run=>run.args[0]==='secret'&&run.args[1]==='bulk').length,1);
  assert.equal(h.runs.filter(run=>run.args[0]==='secret'&&run.args[1]==='list').length,2);
  assert.equal(h.requests.length,1);
@@ -106,7 +115,7 @@ test('repeat native build reuses resources and preserves both existing secrets w
  const h=harness({existing:true,secrets:['DRAW_SECRET','ADMIN_TOKEN','ANOTHER_SECRET']});
  const original=[...h.secretValues];
  const result=await deployCloudflareStaging({env:{},...h});
- assert.equal(result.createdDatabase,false);assert.equal(result.createdBucket,false);
+ assert.equal(result.createdDatabase,false);assert.equal(result.createdContactsDatabase,false);
  assert.deepEqual([...h.secretValues],original);
  assert.ok(!h.runs.some(run=>run.args.includes('create')||run.args.includes('bulk')));
  assert.ok(h.runs.find(run=>run.args[0]==='deploy').args.includes('--keep-vars'));
@@ -141,24 +150,29 @@ test('native CI name override cannot redirect the script to production or anothe
  assert.equal(h.runs.length,0);assert.equal(h.requests.length,0);
 });
 
-test('R2 activation failure is actionable, redacted, and precedes every resource creation',async()=>{
- const h=harness({r2Disabled:true});
- await assert.rejects(()=>deployCloudflareStaging({env:{},...h}),error=>/activation/.test(error.message)&&/billing details/.test(error.message)&&!error.message.includes(PRIVATE));
- assert.deepEqual(h.runs.map(run=>run.args[0]),['whoami','r2']);
+test('contacts migration failure is redacted and prevents deployment, secrets or a ready result',async()=>{
+ const h=harness({existing:true,contactsMigrationFails:true});
+ await assert.rejects(()=>deployCloudflareStaging({env:{},...h}),error=>/D1 operation failed/.test(error.message)&&!error.message.includes(PRIVATE));
+ assert.deepEqual(h.runs.filter(run=>run.args[1]==='migrations').map(run=>run.args[3]),[STAGING.database,STAGING.contactsDatabase]);
+ assert.ok(!h.runs.some(run=>run.args[0]==='deploy'||run.args[0]==='secret'));
+ assert.equal(h.requests.length,0);assert.ok(!h.reports.some(message=>message.startsWith('Staging ready:')));
 });
 
-test('D1 and R2 creation are verified by re-listing and never fall back to invented IDs',async()=>{
- for(const options of [{hideCreatedDatabase:true},{hideCreatedBucket:true}]){
+test('both D1 creations are verified by re-listing and never fall back to invented IDs',async()=>{
+ for(const options of [{hideCreatedDatabase:true},{hideCreatedContactsDatabase:true}]){
   const h=harness(options);
   await assert.rejects(()=>deployCloudflareStaging({env:{},...h}),/not found after creation/);
   assert.ok(!h.runs.some(run=>run.args[0]==='deploy'||run.args[0]==='secret'));
  }
 });
 
-test('R2 parser matches exact labelled names and refuses unrecognized list output',()=>{
- assert.deepEqual(parseBuckets('Listing buckets...\n\nname: '+STAGING.bucket+'-extra\ncreation_date: now\n'),[STAGING.bucket+'-extra']);
- assert.deepEqual(parseBuckets('Listing buckets...\n'),[]);
- assert.throws(()=>parseBuckets(PRIVATE),error=>!error.message.includes(PRIVATE));
+test('research and contact databases resolving to the same ID fail before migrations or deployment',async()=>{
+ for(const existing of [false,true]){
+  const h=harness({existing,sameDatabaseId:true});
+  await assert.rejects(()=>deployCloudflareStaging({env:{},...h}),/two independent D1 databases/);
+  assert.ok(!h.runs.some(run=>run.args[1]==='migrations'||run.args[0]==='deploy'||run.args[0]==='secret'));
+  assert.equal(h.requests.length,0);
+ }
 });
 
 test('only the actual exact staging workers.dev URL is accepted',()=>{

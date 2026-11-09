@@ -31,6 +31,28 @@ export function validateSnapshot(value){
 }
 
 const sqlValue=value=>value===null?'NULL':typeof value==='number'?String(value):"CAST(X'"+Buffer.from(value,'utf8').toString('hex')+"' AS TEXT)";
+
+// Old Sites snapshots keep drawing contacts in R2. The independent backend uses
+// its own D1 database: keep the object key and JSON text, never a research row.
+function contactRows(value){
+ validateSnapshot(value);
+ return value.objects.map(item=>{
+  const match=/^(live|pilot)\/(phones|permits)\/([a-f0-9]{64})\.json$/.exec(item.key);
+  if(!match)fail('Unsupported contact object key: expected a live/pilot phone or permit');
+  if(Object.keys(item.customMetadata||{}).length||Object.keys(item.httpMetadata||{}).some(key=>key!=='contentType')||(item.httpMetadata?.contentType!==undefined&&item.httpMetadata.contentType!=='application/json'))fail('Unsupported contact object metadata');
+  let text,record;
+  try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(Buffer.from(item.bodyBase64,'base64'));}catch{fail('Contact object is not valid UTF-8');}
+  try{record=JSON.parse(text);}catch{fail('Contact object is not valid JSON');}
+  const field=match[2]==='phones'?'phone':'phoneHash';
+  if(!record||Array.isArray(record)||typeof record!=='object'||Object.keys(record).join('|')!==field)fail('Unsupported contact JSON fields');
+  if(field==='phone'){
+   if(typeof record.phone!=='string'||!/^\+852[2-9]\d{7}$/.test(record.phone))fail('Invalid contact phone');
+   if(digest(Buffer.from(record.phone,'utf8'))!==match[3])fail('Contact phone key does not match its phone');
+  }else if(typeof record.phoneHash!=='string'||!/^[a-f0-9]{64}$/.test(record.phoneHash))fail('Invalid contact phone hash');
+  return {key:item.key,value:text};
+ });
+}
+
 export function snapshotSQL(value){
  validateSnapshot(value);
  // The CHECK aborts import into a nonempty target before any slot writes.
@@ -39,16 +61,25 @@ export function snapshotSQL(value){
  return start+value.slots.map(row=>'INSERT INTO slots ('+columns.join(',')+') VALUES ('+columns.map(c=>sqlValue(row[c])).join(',')+');').join('\n')+'\n';
 }
 
+export function contactsSQL(value){
+ const rows=contactRows(value);
+ const start='-- PRIVATE DRAW CONTACTS. Import only into the separate, empty contacts D1 database after a write freeze.\nCREATE TABLE __psyc_contacts_import_empty_guard (n INTEGER NOT NULL CHECK(n=0));\nINSERT INTO __psyc_contacts_import_empty_guard SELECT COUNT(*) FROM contact_objects;\nDROP TABLE __psyc_contacts_import_empty_guard;\n';
+ return start+rows.map(row=>'INSERT INTO contact_objects (key,value) VALUES ('+sqlValue(row.key)+','+sqlValue(row.value)+');').join('\n')+'\n';
+}
+
 export function prepareSnapshot(value,out){
- validateSnapshot(value);
+ // Validate and build both imports before creating any output. Unsupported R2
+ // data must not silently disappear when moving to the contact database.
+ const slots=snapshotSQL(value),contacts=contactsSQL(value);
  if(fs.existsSync(out))fail('Output directory already exists; choose a new private directory');
  fs.mkdirSync(out,{recursive:true,mode:0o700});
- fs.writeFileSync(path.join(out,'slots.sql'),snapshotSQL(value),{mode:0o600});
+ fs.writeFileSync(path.join(out,'slots.sql'),slots,{mode:0o600});
+ fs.writeFileSync(path.join(out,'contacts.sql'),contacts,{mode:0o600});
  fs.mkdirSync(path.join(out,'objects'),{mode:0o700});
  const objects=value.objects.map((item,i)=>{const file='objects/'+String(i).padStart(8,'0')+'.bin';fs.writeFileSync(path.join(out,file),Buffer.from(item.bodyBase64,'base64'),{mode:0o600});const {bodyBase64,...metadata}=item;return {...metadata,file};});
  fs.writeFileSync(path.join(out,'r2-manifest.json'),JSON.stringify({format:value.format,objects},null,2)+'\n',{mode:0o600});
- fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify({format:value.format,protocol:value.protocol,slots:value.slots.length,submitted:value.slots.filter(r=>r.submitted).length,objects:objects.length,slotSQLSHA256:digest(fs.readFileSync(path.join(out,'slots.sql')))},null,2)+'\n',{mode:0o600});
- return {slots:value.slots.length,objects:objects.length};
+ fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify({format:value.format,protocol:value.protocol,slots:value.slots.length,submitted:value.slots.filter(r=>r.submitted).length,objects:objects.length,contacts:objects.length,contactStorage:'separate-d1',slotSQLSHA256:digest(Buffer.from(slots)),contactsSQLSHA256:digest(Buffer.from(contacts))},null,2)+'\n',{mode:0o600});
+ return {slots:value.slots.length,objects:objects.length,contacts:objects.length};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

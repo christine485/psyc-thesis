@@ -34,29 +34,18 @@ export function resolveAccount(output,env={}){
  return accounts[0];
 }
 
-export function parseBuckets(output){
- // Pinned Wrangler 4.92 has no R2 list --json flag. Its labelled output is
- // "Listing buckets...", followed by exact "name:" / "creation_date:" pairs.
- const plain=stripVTControlCharacters(output);
- if(!/^\s*Listing buckets\.\.\.\s*$/m.test(plain))throw Error('Wrangler returned an unreadable R2 bucket list. No bucket was created. Retry the build.');
- const names=[];
- for(const line of plain.split(/\r?\n/)){
-  if(!/^\s*name:/.test(line))continue;
-  const match=/^\s*name:\s*([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])\s*$/.exec(line);
-  if(!match)throw Error('Wrangler returned an invalid R2 bucket name. No bucket was created.');
-  names.push(match[1]);
- }
- if(new Set(names).size!==names.length)throw Error('The R2 bucket list contains duplicate names. Check the Cloudflare account before retrying.');
- return names;
-}
-
-function findDatabase(output){
+function stagingDatabases(output){
  const databases=parseJson(output,'D1 database list');
  if(!Array.isArray(databases)||databases.some(db=>!db||typeof db.name!=='string'))throw Error('Wrangler returned an invalid D1 database list. No database ID was guessed.');
- const matches=databases.filter(db=>db.name===STAGING.database);
- if(matches.length>1)throw Error('Several D1 databases have the staging name. Resolve the duplicate names before retrying.');
- if(matches[0]&&!DATABASE_ID.test(matches[0].uuid||''))throw Error('Wrangler did not return a valid staging D1 database ID. No ID was guessed.');
- return matches[0];
+ const findDatabase=name=>{
+  const matches=databases.filter(db=>db.name===name);
+  if(matches.length>1)throw Error('Several D1 databases have a staging name. Resolve the duplicate names before retrying.');
+  if(matches[0]&&!DATABASE_ID.test(matches[0].uuid||''))throw Error('Wrangler did not return a valid staging D1 database ID. No ID was guessed.');
+  return matches[0];
+ };
+ const db=findDatabase(STAGING.database),contactsDb=findDatabase(STAGING.contactsDatabase);
+ if(db&&contactsDb&&db.uuid.toLowerCase()===contactsDb.uuid.toLowerCase())throw Error('Research answers and draw contacts require two independent D1 databases. The returned database IDs match; no migrations or deployment were run.');
+ return {db,contactsDb};
 }
 
 function secretNames(output){
@@ -82,7 +71,6 @@ export function deploymentOrigin(output){
 
 function operationError(args){
  if(args[0]==='whoami')return 'Cloudflare could not authenticate this build. Keep the automatically created build API token selected and retry. Never paste the token into chat.';
- if(args[0]==='r2')return 'R2 could not be accessed. Open Cloudflare R2 Object Storage and complete its activation if requested; check this build token has Workers R2 Storage (edit), then retry. R2 activation may require billing details.';
  if(args[0]==='d1')return 'The staging D1 operation failed. Check this build token has D1 Storage (edit) and the account has available D1 capacity, then retry. Existing research data was not deleted.';
  if(args[0]==='secret')return 'The staging Worker secret operation failed. Check this build token has Workers Scripts (edit), then retry. Existing secret values are preserved on reruns.';
  return 'The staging Worker deployment failed. Check the Cloudflare build token permissions and Workers setup, then retry the build.';
@@ -118,6 +106,7 @@ export async function runWrangler(args,{env,input}={}){
 
 export async function deployCloudflareStaging({env=process.env,run=runWrangler,fetchImpl=fetch,report=console.log,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  if(env.WRANGLER_CI_OVERRIDE_NAME!==undefined&&env.WRANGLER_CI_OVERRIDE_NAME!==STAGING.worker)throw Error('Set the Cloudflare project name to '+STAGING.worker+' before deploying. This build is restricted to that staging Worker.');
+ if(!STAGING.contactsDatabase||STAGING.database===STAGING.contactsDatabase)throw Error('Research answers and draw contacts require two different staging database names.');
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),'psyc-native-staging-'));
  try{
   // A path ending in .log is important: Wrangler treats other paths as log
@@ -135,24 +124,25 @@ export async function deployCloudflareStaging({env=process.env,run=runWrangler,f
   const accountId=resolveAccount(await command(['whoami','--json','--config',identityConfig]),env);
   operationEnv.CLOUDFLARE_ACCOUNT_ID=accountId;
   await fs.writeFile(identityConfig,JSON.stringify({...identity,account_id:accountId}),{mode:0o600});
-  const bucketList=()=>command(['r2','bucket','list','--config',identityConfig]).then(parseBuckets);
-  const databaseList=()=>command(['d1','list','--json','--config',identityConfig]).then(findDatabase);
-  // Check R2 activation before creating any staging resources.
-  const buckets=await bucketList();
-  let db=await databaseList(),createdDatabase=false,createdBucket=false;
+  const databaseList=()=>command(['d1','list','--json','--config',identityConfig]).then(stagingDatabases);
+  // Only D1 databases and the staging Worker are provisioned. Deployment never
+  // activates subscriptions, changes account plans or enables paid overages.
+  let {db,contactsDb}=await databaseList(),createdDatabase=false,createdContactsDatabase=false;
   if(!db){
    await command(['d1','create',STAGING.database,'--no-update-config','--config',identityConfig]);
-   createdDatabase=true;db=await databaseList();
+   createdDatabase=true;({db,contactsDb}=await databaseList());
    if(!db)throw Error('The new staging D1 database was not found after creation. Retry after checking D1 in Cloudflare. No database ID was guessed.');
   }
-  if(!buckets.includes(STAGING.bucket)){
-   await command(['r2','bucket','create',STAGING.bucket,'--no-update-config','--config',identityConfig]);
-   createdBucket=true;
-   if(!(await bucketList()).includes(STAGING.bucket))throw Error('The staging R2 bucket was not found after creation. Retry after checking R2 in Cloudflare.');
+  if(!contactsDb){
+   await command(['d1','create',STAGING.contactsDatabase,'--no-update-config','--config',identityConfig]);
+   createdContactsDatabase=true;({db,contactsDb}=await databaseList());
+   if(!contactsDb)throw Error('The new staging draw contacts D1 database was not found after creation. Retry after checking D1 in Cloudflare. No database ID was guessed.');
   }
-  const config=await prepareConfig(temp,accountId,db.uuid);
+  if(!db)throw Error('The research D1 database could not be verified before migration. No database ID was guessed.');
+  const config=await prepareConfig(temp,accountId,db.uuid,contactsDb.uuid);
   report('Applying staging database migrations and deploying the pilot experiment.');
   await command(['d1','migrations','apply',STAGING.database,'--remote','--config',config]);
+  await command(['d1','migrations','apply',STAGING.contactsDatabase,'--remote','--config',config]);
   const origin=deploymentOrigin(await command(['deploy','--keep-vars','--config',config]));
   const listSecrets=()=>command(['secret','list','--format','json','--config',config]).then(secretNames);
   const existing=await listSecrets();
@@ -175,8 +165,8 @@ export async function deployCloudflareStaging({env=process.env,run=runWrangler,f
    }catch{}
    if(attempt<5)await pause(2000);
   }
-  if(!ready)throw Error('Staging deployed, but its protocol, pilot restriction or D1/R2 health check is not ready. Retry after checking Cloudflare. Do not invite participants yet.');
-  const result={url:origin+'/?mode=pilot',databaseId:db.uuid,createdDatabase,createdBucket,productionChanged:false};
+  if(!ready)throw Error('Staging deployed, but its protocol, pilot restriction or independent D1 storage health check is not ready. Retry after checking Cloudflare. Do not invite participants yet.');
+  const result={url:origin+'/?mode=pilot',databaseId:db.uuid,contactsDatabaseId:contactsDb.uuid,createdDatabase,createdContactsDatabase,productionChanged:false};
   report('Staging ready: '+result.url);
   report('A Hong Kong test without VPN is still required before switching the public experiment.');
   return result;

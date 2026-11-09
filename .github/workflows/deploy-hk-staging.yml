@@ -3,6 +3,8 @@ name: Deploy Hong Kong staging
 on:
   push:
     branches: [main, prepare-hk-independent-backend]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

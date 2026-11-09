@@ -2,6 +2,8 @@
 
 目標入口保持：<https://christine485.github.io/psyc-thesis/>。
 
+使用者要求只使用免費方案：新後端使用 Workers Free 與兩個獨立 D1（研究答案、抽獎聯絡資料），不開通 R2、不選擇 Workers Paid。原 Sites 的歷史 R2 保留作遷移來源。免費用量有限額，不能承諾無限招募；D1 Free 超出額度會拒絕查詢，程式不會自動升級。參考 [D1 Free 說明](https://developers.cloudflare.com/d1/platform/pricing/) 及 [Workers 方案](https://developers.cloudflare.com/workers/platform/pricing/)。
+
 帳戶已建立並在 Cloudflare 選擇 GitHub 程式庫時，使用 [Cloudflare 畫面逐格設定](CLOUDFLARE_DASHBOARD_SETUP.md) 部署隔離試測網站。另有 [GitHub Actions 安全設定指引](CLOUDFLARE_GITHUB_SETUP.md)。兩者均不切換正式 API。
 
 目前程式已準備獨立 Cloudflare Workers 後端，但**未部署、未遷移正式資料、未完成香港無 VPN 實測，正式入口未切換**。不能將本機測試或海外雲端成功連線當成香港驗收結果。
@@ -9,8 +11,8 @@
 ## 1. 先建立你的 Cloudflare 帳戶
 
 1. 在官方頁面 <https://dash.cloudflare.com/sign-up> 註冊，完成電郵驗證，並啟用雙重認證。
-2. 在 Dashboard 的 Workers & Pages、D1、R2 頁面確認可建立服務。使用 `workers.dev` 網址通常毋須購買網域；香港可否使用仍須實測。
-3. R2 需要啟用訂閱，可能要求付款方式；啟用前查看帳戶畫面及 [R2 收費](https://developers.cloudflare.com/r2/pricing/)。Workers、D1 也有用量限制，不能承諾永久免費。
+2. 在 Dashboard 的 Workers & Pages、D1 頁面確認可建立免費服務。使用 `workers.dev` 網址通常毋須購買網域；香港可否使用仍須實測。
+3. 保持 Workers Free，略過 R2 訂閱及付款畫面。新後端只使用 D1；實際帳戶方案需在 Cloudflare 確認，Wrangler 的帳戶識別結果本身不能證明 Free 方案。
 4. 帳戶準備好後，以官方 OAuth 授權 Wrangler。在有此程式碼的受信任電腦上執行 `npx wrangler login`，只在 Cloudflare 官方登入頁完成授權。若協作者使用的遠端環境未能接收 OAuth，須另行使用該環境支援的安全秘密值設定渠道；不能把瀏覽器登入狀態視為遠端已獲授權。
 
 不要將 Cloudflare 密碼、API token、`DRAW_SECRET` 或 `ADMIN_TOKEN` 貼入對話、GitHub 檔案、issue、PR、前端設定或網址。若日後使用 CI 部署，token 只放 GitHub Actions 的秘密值設定，並限制至指定帳戶及所需資源。
@@ -19,7 +21,7 @@
 
 ## 2. 新後端部署準備
 
-此部分由部署人員操作。先建獨立試測服務及儲存資源，再建立正式服務；兩者不要共用 D1 或 R2。`?mode=pilot` 與正式資料另有邏輯分隔，但並不能取代部署環境隔離。
+此部分由部署人員操作。先建獨立試測服務及儲存資源，再建立正式服務；試測與正式各有兩個獨立 D1，不互相共用。`?mode=pilot` 與正式資料另有邏輯分隔，但並不能取代部署環境隔離。
 
 在 `standalone/`：
 
@@ -32,14 +34,15 @@ npm run typecheck
 cp wrangler.example.jsonc wrangler.jsonc
 ```
 
-範例採用 `psyc-thesis-api`、D1 `psyc-thesis-research` 及 R2 `psyc-thesis-draw` 名稱。試測請改為另一些名稱，避免覆蓋正式資源。
+範例採用 `psyc-thesis-api`、研究 D1 `psyc-thesis-research` 及抽獎 D1 `psyc-thesis-draw` 名稱。試測請改為另一些名稱，避免覆蓋正式資源。
 
-建立資源後，把**工具實際回傳**的 D1 ID 填入 `wrangler.jsonc`，確認 `DB`、`BUCKET` 綁定及帳戶正確。範例 ID 不能直接部署。按實際資源名稱操作，例如：
+建立資源後，把**工具實際回傳**的 D1 ID 填入 `wrangler.jsonc`，確認 `DB`、`CONTACTS_DB` 綁定指向不同資料庫 ID，且帳戶正確。範例 ID 不能直接部署。按實際資源名稱操作，例如：
 
 ```sh
 npx wrangler d1 create psyc-thesis-research
-npx wrangler r2 bucket create psyc-thesis-draw
+npx wrangler d1 create psyc-thesis-draw
 npx wrangler d1 migrations apply psyc-thesis-research --remote
+npx wrangler d1 migrations apply psyc-thesis-draw --remote
 npx wrangler secret put DRAW_SECRET
 npx wrangler secret put ADMIN_TOKEN
 npm run deploy
@@ -53,7 +56,7 @@ npm run deploy
 
 ## 3. 正式資料遷移：必須先取得完整、安全的快照
 
-舊系統把研究記錄放 D1，把抽獎聯絡資料放 R2。研究 CSV 及電話 CSV 適合研究者下載與核對，**不足以還原整個系統**。
+舊系統把研究記錄放 D1，把抽獎聯絡資料放 R2。免費新系統把兩者放在不同 D1，抽獎表為 `contact_objects(key,value)`；鍵值及 JSON 延續舊系統，保持電話去重及資格狀態。研究 CSV 及電話 CSV 適合研究者下載與核對，**不足以還原整個系統**。
 
 正式切換前，需要由有權擁有者取得及核對：
 
@@ -68,12 +71,11 @@ npm run deploy
 ```sh
 node tests/migration.test.mjs
 node scripts/import-study-snapshot.mjs --snapshot /private/snapshot.json --out /private/new-import
-node scripts/prepare-study-r2-upload.mjs --manifest /private/new-import/r2-manifest.json --bucket 實際目標桶名稱 --wrangler /絕對路徑/node_modules/wrangler/bin/wrangler.js --config /絕對路徑/standalone/wrangler.jsonc
 ```
 
-第一個準備工具輸出 `slots.sql`、`objects/`、`r2-manifest.json` 及摘要，不會複製上傳程式。第二個工具產生私人的 `r2-upload-plan.json`，內容是供審查的命令參數陣列；**兩個工具都不會執行遠端匯入或上傳**。命令內的路徑及桶名稱須換成實際值。
+準備工具輸出分開的 `slots.sql`（研究 D1）及 `contacts.sql`（抽獎 D1），另保留原始 `objects/`、`r2-manifest.json` 及摘要作私密備份。它不會進行任何遠端寫入；也不需要開通新 R2。舊 `prepare-study-r2-upload.mjs` 只供歷史維護，免費遷移路徑不使用它。
 
-只可在確認目標是專用、全新、空白的 D1／R2，並且新舊服務皆處於維護狀態、沒有其他管理寫入之後，另行審查和執行匯入命令。SQL 有拒絕非空目標的檢查；R2 CLI 上傳沒有條件寫入保護，不能在既有或並行使用的桶執行。若匯入失敗或只完成一部分，放棄該目標資源並在新空白資源重試，不要當成可安全重跑覆寫。原 `DRAW_SECRET` 必須另外安全移交。
+只可匯入兩個全新、空白且不同 ID 的 D1，並先確認新舊服務皆處於維護狀態、沒有其他管理寫入。兩份 SQL 均拒絕非空目標；不可將 `contacts.sql` 匯入研究資料庫。工具會核對舊 R2 的 JSON、鍵名及雜湊，拒絕未知格式或不支援的 metadata，避免靜默遺失。若匯入失敗或只完成一部分，保留備份並以新空白目標重試。原 `DRAW_SECRET` 必須另外安全移交。
 
 仍須確定擁有者可以安全匯出、匯入和核對，才可正式切換。不得猜測資料庫 ID、取得其他帳戶的資源，或把敏感快照提交至公開 GitHub。若無法取得完整快照或原密鑰，維持舊服務及歷史資料，先解決存取途徑；這不是已完成遷移。
 
@@ -82,7 +84,7 @@ node scripts/prepare-study-r2-upload.mjs --manifest /private/new-import/r2-manif
 1. 暫停招募，記錄切換時間；在維護開關啟用之前，處理正在作答及待抽獎的參加者。
 2. 先部署包含維護開關與快照端點的程式。在新舊服務設定 `STUDY_MAINTENANCE=1`，實際確認開始、提交、抽獎三個 POST 都被拒絕，並確保沒有其他管理寫入。待已在執行的請求完成後才取一致快照；不能只靠發通知或改前端便假定舊後端已停止寫入。維護期間應保留參加者頁面，不要叫人重新整理而丟失答案。
 3. 將快照放在受保護位置，備份並記錄檔案雜湊；匯入尚未對公眾開放的新正式資源，使用原抽獎密鑰。
-4. 比較遷移前後每個 `mode` 的名額總數、已提交數、有效問卷數、最大 ID、進行中名額，以及 R2 兩類物件的數量及內容雜湊。檢查抽獎電話去重與已使用資格仍有效。
+4. 比較遷移前後每個 `mode` 的名額總數、已提交數、有效問卷數、最大 ID、進行中名額，以及原 R2 兩類物件與新抽獎 D1 對應鍵值的數量及內容雜湊。檢查抽獎電話去重與已使用資格仍有效。
 5. 核對研究 CSV 與電話 CSV 可安全下載、內容相符。研究匯出不含電話；電話匯出只有電話，沒有研究分配或答案。
 6. 獨立試測環境先完成下方香港實測，再更新 GitHub Pages 的正式後端設定，按切換安排解除新正式服務的維護狀態並完成確認；舊服務繼續維持 `STUDY_MAINTENANCE=1` 封存，防止舊快取頁面繼續寫入。
 
@@ -113,7 +115,7 @@ node scripts/set-study-backend.mjs --api-base https://實際部署網址
 | --- | --- | --- |
 | 香港手機＋家居／校園 Wi-Fi，無 VPN | 同意書 → 隨機分配 → 27 張主圖＋1 次注意力試次 → 詞語評分 → 背景資料 → 最後提交 | 全部圖片載入；畫面確認問卷提交；伺服器回應 `submitted:true`；受保護匯出找到該測試記錄 |
 | 香港手機＋流動數據，無 VPN | 同上完整流程，建議另一電訊網絡 | 同上，記錄網絡、裝置、瀏覽器、時間及結果 |
-| 有效問卷＋自願抽獎 | 注意力條件正確，完成獨立電話提交 | 畫面確認登記；R2／受保護電話匯出確認成功；研究資料不含電話 |
+| 有效問卷＋自願抽獎 | 注意力條件正確，完成獨立電話提交 | 畫面確認登記；抽獎 D1／受保護電話匯出確認成功；研究資料不含電話 |
 | 中途短暫斷線 | 保留頁面，恢復網絡並重試提交 | 答案只存一次；抽獎只登記一次；不要求重新整理或重新作答 |
 | 無權限訪客 | 不帶管理秘密值請求資料匯出 | 下載被拒；公開前端未包含任何管理秘密值 |
 | 所有刺激材料 | 使用核對程式檢查 270 張，不只某位參加者的 28 張 | 雜湊及 1024×1024 尺寸全部通過；抽查 GitHub Pages 圖片可達 |
