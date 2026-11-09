@@ -11,8 +11,8 @@
 | 畫面欄位 | 填寫內容 |
 | --- | --- |
 | Project name | `psyc-thesis-hk-staging-api` |
-| Build command | `npm run study:build` |
-| Deploy command | `npm run study:deploy` |
+| Build command | `npm run build-study` |
+| Deploy command | `npm run deploy-study` |
 | Enable Preview builds | 關閉 |
 | Protect with Cloudflare Access | 關閉，讓測試者可匿名參與 |
 | Advanced settings → Path | `/` |
@@ -21,6 +21,8 @@
 | Variable name / Variable value | 留空 |
 
 Node.js 版本由程式庫的 `.nvmrc` 指定為 24。程式已放在 `main` 後，可使用初始畫面預設的主分支；日後在 Worker → Settings → Build → Branch control 核對。
+
+這兩行使用沒有冒號的名稱，避免輸入時在冒號後自動加入空格。原本的 `study:build`／`study:deploy` 仍可使用，但 `study: build`／`study: deploy` 會被 npm 當成不存在的 `study:` 命令。已建立的 Worker 可在 Settings → Build 修改命令後重試。
 
 展開 token 權限說明，確認至少包括 Account Settings Read、Workers Scripts Edit，以及 D1 Storage Edit／D1 Edit。使用者提供的建立畫面已顯示所需權限；自動 token 即使列出 R2 權限，部署程式也不會呼叫 R2 或開通訂閱。
 
