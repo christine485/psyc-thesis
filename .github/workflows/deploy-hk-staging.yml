@@ -34,6 +34,8 @@ jobs:
           npm --prefix standalone run typecheck
           node tests/protocol.test.mjs
           node tests/image-loader.test.mjs
+          node tests/image-preload.test.mjs
+          node tests/study-request.test.mjs
           node tests/server.test.mjs
           node tests/migration.test.mjs
           node tests/staging-deploy.test.mjs
@@ -45,3 +47,33 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
         run: node scripts/deploy-hk-staging.mjs
+
+  browser-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: qa/package-lock.json
+      - name: Install browser test tools
+        run: npm ci --prefix qa --no-audit --no-fund
+      - name: Install browser engine
+        run: node qa/node_modules/playwright-core/cli.js install --with-deps ${{ matrix.browser }}
+      - name: Complete the experiment on four viewport sizes
+        run: node qa/browser-flow.mjs --engines=${{ matrix.browser }}
+      - name: Preserve browser reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-qa-${{ matrix.browser }}
+          path: work/browser-qa/
+          retention-days: 7
