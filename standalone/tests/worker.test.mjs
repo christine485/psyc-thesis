@@ -25,14 +25,27 @@ test('GitHub origin preflight allowed, unknown origins and headers refused',asyn
   assert.equal((await fetchHandler(req('/api/study/start',{}, {Origin:'https://untrusted.example'}),env)).status,403);
   assert.equal((await fetchHandler(new Request(preflight,{headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'authorization'}}),env)).status,403);
 });
-test('admin export and counts require secret, reject cross-origin and secretless startup',async()=>{
+test('admin export and counts require a secret and accept only the trusted website origins',async()=>{
   const {env}=fixture();assert.equal((await fetchHandler(new Request('https://api.example.test/api/admin/status'),env)).status,403);
   assert.equal((await fetchHandler(admin('/api/admin/status',env,{Authorization:'Bearer '+env.ADMIN_TOKEN+'wrong'}),env)).status,403);
-  assert.equal((await fetchHandler(admin('/api/admin/status',env,{Origin:origin}),env)).status,403);
+  const website=await fetchHandler(admin('/api/admin/status',env,{Origin:origin}),env);assert.equal(website.status,200);assert.equal(website.headers.get('Access-Control-Allow-Origin'),origin);
+  assert.equal((await fetchHandler(admin('/api/admin/status',env,{Origin:'https://untrusted.example'}),env)).status,403);
   assert.equal((await fetchHandler(admin('/api/admin/status',env),env)).status,200);
   assert.equal((await fetchHandler(admin('/api/admin/export?mode=typo&kind=draw',env),env)).status,400);
   const contacts=env.CONTACTS_DB;env.CONTACTS_DB=undefined;assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID())),env)).status,503);env.CONTACTS_DB=contacts;
   env.DRAW_SECRET='';assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID())),env)).status,503);
+});
+test('website admin preflight is read-only, origin-specific and does not bypass authorization',async()=>{
+  const {env}=fixture();
+  for(const route of ['/api/admin/status','/api/admin/export-index?mode=pilot','/api/admin/coverage?mode=pilot','/api/admin/export?mode=pilot&kind=research']){
+    const url='https://api.example.test'+route;
+    const request=extra=>new Request(url,{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'Authorization',...extra}});
+    const response=await fetchHandler(request(),env);assert.equal(response.status,204);assert.equal(response.headers.get('Access-Control-Allow-Origin'),origin);assert.equal(response.headers.get('Access-Control-Allow-Credentials'),null);assert.equal(response.headers.get('Access-Control-Allow-Headers'),'Authorization');
+    for(const extra of [{Origin:'https://attacker.example'},{Origin:''},{'Access-Control-Request-Method':'POST'},{'Access-Control-Request-Headers':'authorization, x-other'}])assert.equal((await fetchHandler(request(extra),env)).status,403);
+    assert.equal((await fetchHandler(new Request(url,{headers:{Origin:origin}}),env)).status,403);
+  }
+  const denied=await fetchHandler(admin('/api/admin/coverage?mode=pilot',env,{Origin:'https://attacker.example'}),env);assert.equal(denied.status,403);
+  const coverage=await fetchHandler(admin('/api/admin/coverage?mode=pilot',env,{Origin:origin}),env);assert.equal(coverage.status,200);assert.equal((await coverage.json()).images.length,270);
 });
 test('full pilot flow saves once, preserves live isolation, draw and research remain separate',async()=>{
   const {env,sqlite,contacts}=fixture(),token=crypto.randomUUID();const allocation=await fetchHandler(req('/api/study/start',start(token)),env);assert.equal(allocation.status,200);
@@ -79,4 +92,6 @@ test('isolated staging accepts its own frontend but refuses all live-mode writes
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM slots WHERE mode LIKE 'live:%'").get().n,0);
   assert.equal((await fetchHandler(req('/api/study/start',start(crypto.randomUUID()),{Origin:'https://attacker.example'}),env)).status,403);
   const health=await(await fetchHandler(new Request(ownOrigin+'/api/health'),env)).json();assert.equal(health.stagingOnly,true);
+  assert.equal((await fetchHandler(admin('/api/admin/status',env,{Origin:origin}),env)).status,403);
+  assert.equal((await fetchHandler(new Request(ownOrigin+'/api/admin/status',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'Authorization'}}),env)).status,403);
 });

@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://psyc-thesis-api.christine040805.workers.dev; img-src 'self'; base-uri 'none'; form-action 'none'">
   <title>研究資料下載</title>
-  <link rel="stylesheet" href="./researcher.css?v=20261109">
-  <script type="module" src="./researcher.js?v=20261109"></script>
+  <link rel="stylesheet" href="./researcher.css?v=formal-20261109">
+  <script type="module" src="./researcher.js?v=formal-20261109"></script>
 </head>
 <body>
 <main>
@@ -16,8 +17,8 @@
   <p id="service-status" class="note" role="status">正在讀取服務狀態…</p>
   <section id="wrong-host" class="card" hidden>
     <h2>請開啟研究後台網址</h2>
-    <p>管理密碼只應輸入到研究後端。請按以下連結前往：</p>
-    <a href="https://psyc-thesis-hk-staging-api.christine040805.workers.dev/researcher">開啟研究後台</a>
+    <p>正式網站的資料後台尚未接駁，這一頁暫時不接受管理密碼。現有試測資料可從試測後台查看：</p>
+    <a id="backend-link" href="https://psyc-thesis-hk-staging-api.christine040805.workers.dev/researcher">開啟試測後台</a>
   </section>
   <section id="sign-in" class="card">
     <h2>登入後台</h2>
@@ -32,7 +33,7 @@
       <summary>第一次使用？設定管理密碼</summary>
       <ol>
         <li>按下面的「產生管理密碼」，再複製及儲存到你自己的密碼管理器。</li>
-        <li>在另一個分頁開啟 <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare</a>，選 <strong>Workers &amp; Pages → psyc-thesis-hk-staging-api → Settings</strong>。</li>
+        <li>在另一個分頁開啟 <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare</a>，選 <strong>Workers &amp; Pages → <span id="setup-worker-name">psyc-thesis-hk-staging-api</span> → Settings</strong>。</li>
         <li>找到 <strong>Variables and Secrets</strong>，編輯已有的 <strong>ADMIN_TOKEN</strong>，類型選 <strong>Secret</strong>，貼上剛才產生的密碼，再按儲存／Deploy。</li>
         <li>返回本頁，把同一個密碼貼到上面的登入欄。</li>
       </ol>
@@ -54,6 +55,14 @@
     <dl class="counts"><div><dt>已提交問卷</dt><dd id="submitted">—</dd></div><div><dt>曾分配名額</dt><dd id="allocated">—</dd></div></dl>
     <p class="help">已提交包括未通過注意力測試的問卷；曾分配名額包括過期或未完成的分配。</p>
     <button id="refresh" class="secondary" type="button">更新數字</button>
+    <section id="coverage-panel" aria-labelledby="coverage-title">
+      <h3 id="coverage-title">圖片評估覆蓋</h3>
+      <p id="coverage-status" class="help" role="status">正在讀取圖片評估次數…</p>
+      <dl class="counts"><div><dt>每張主圖完整評估次數</dt><dd id="coverage-range">—</dd></div><div><dt>尚未有完整評估的主圖</dt><dd id="coverage-zero">—</dd></div></dl>
+      <p class="help">完整評估次數以已提交問卷的主試次計算。詞語評分數會隨參加者命名的情緒類別而不同；注意力試次另行處理。</p>
+      <details><summary>查看每張圖片的次數</summary><div class="table-scroll"><table><thead><tr><th scope="col">圖片</th><th scope="col">條件</th><th scope="col">完整評估</th><th scope="col">有效問卷評估</th><th scope="col">詞語評分數</th></tr></thead><tbody id="coverage-body"></tbody></table></div></details>
+      <button id="download-coverage" class="secondary" type="button" disabled>下載圖片覆蓋 CSV</button>
+    </section>
     <div class="downloads">
       <button id="download-research" type="button">下載研究答案 CSV</button>
       <button id="download-draw" class="secondary" type="button">下載抽獎電話 CSV</button>

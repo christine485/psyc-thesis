@@ -40,6 +40,8 @@ jobs:
           node tests/migration.test.mjs
           node tests/staging-deploy.test.mjs
           node tests/cloudflare-native-deploy.test.mjs
+          node tests/formal-native-deploy.test.mjs
+          node tests/backend-cutover.test.mjs
       - name: Deploy isolated staging
         if: ${{ github.event_name == 'workflow_dispatch' && vars.CLOUDFLARE_ACCOUNT_ID != '' }}
         env:

@@ -15,7 +15,8 @@
     "study:build": "npm ci --prefix standalone --no-audit --no-fund && npm --prefix standalone run typecheck && npm --prefix standalone test && node tests/protocol.test.mjs && node tests/image-loader.test.mjs && node tests/image-preload.test.mjs && node tests/study-request.test.mjs",
     "study:deploy": "node scripts/deploy-cloudflare-staging.mjs",
     "build-study": "npm run study:build",
-    "deploy-study": "npm run study:deploy"
+    "deploy-study": "npm run study:deploy",
+    "deploy-formal": "node scripts/deploy-cloudflare-formal.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

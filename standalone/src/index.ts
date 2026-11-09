@@ -1,6 +1,7 @@
 import {createStudyServer} from '../../lib/study-core.ts';
 import {PROTOCOL, STIMULI} from '../../docs/modules/protocol.mjs';
 import {createContactStore,exportDrawCSV} from './contact-store.ts';
+import {studyCoverage} from './coverage.ts';
 
 export interface Env {
   DB: D1Database;
@@ -44,7 +45,7 @@ async function readBody(req:Request) {
   const value=JSON.parse(new TextDecoder().decode(bytes));
   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('資料格式不正確。');return value;
 }
-function adminOriginAllowed(req:Request,url:URL){const origin=req.headers.get('Origin');return !origin||origin===url.origin;}
+function adminOriginAllowed(req:Request,url:URL,env:Env){const origin=req.headers.get('Origin');return !origin||origin===url.origin||(env.STAGING_ONLY!=='1'&&origin===PARTICIPANT_ORIGIN);}
 export async function fetchHandler(req:Request,env:Env):Promise<Response> {
   const url=new URL(req.url),path=url.pathname;
   if(path==='/api/health' && req.method==='GET') {
@@ -53,9 +54,15 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
     const ready=configurationReady&&storageReady&&env.STUDY_MAINTENANCE!=='1';
     return json(req,{ok:ready,protocol:PROTOCOL,images:STIMULI.length,configurationReady,storageReady,maintenance:env.STUDY_MAINTENANCE==='1',stagingOnly:env.STAGING_ONLY==='1'},ready?200:503);
   }
-  if(path==='/api/admin/export'||path==='/api/admin/status'||path==='/api/admin/export-index') {
+  if(path==='/api/admin/export'||path==='/api/admin/status'||path==='/api/admin/export-index'||path==='/api/admin/coverage') {
+    if(req.method==='OPTIONS') {
+      const origin=req.headers.get('Origin');
+      const requested=(req.headers.get('Access-Control-Request-Headers')||'').toLowerCase().split(',').map(value=>value.trim()).filter(Boolean);
+      if(!origin||!adminOriginAllowed(req,url,env)||req.headers.get('Access-Control-Request-Method')!=='GET'||requested.some(value=>value!=='authorization'))return json(req,{error:'此管理來源或要求未獲允許。'},403);
+      return new Response(null,{status:204,headers:{...headers(req),'Access-Control-Allow-Methods':'GET, OPTIONS','Access-Control-Allow-Headers':'Authorization','Access-Control-Max-Age':'600'}});
+    }
     if(req.method!=='GET')return json(req,{error:'Method not allowed'},405);
-    if(!adminOriginAllowed(req,url)||!await authorized(req,env))return json(req,{error:'僅研究團隊可下載。'},403);
+    if(!adminOriginAllowed(req,url,env)||!await authorized(req,env))return json(req,{error:'僅研究團隊可下載。'},403);
     if(!configured(env))return json(req,{error:'研究服務尚未準備好。'},503);
     try{
       if(path==='/api/admin/status') {
@@ -67,6 +74,10 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
         return json(req,{protocol:PROTOCOL,maintenance:env.STUDY_MAINTENANCE==='1',modes});
       }
       const mode=url.searchParams.get('mode'),kind=url.searchParams.get('kind');
+      if(path==='/api/admin/coverage') {
+        if(!['pilot','live'].includes(mode||''))return json(req,{error:'請指定 mode=pilot 或 live。'},400);
+        return json(req,await studyCoverage(env.DB,mode!));
+      }
       if(path==='/api/admin/export-index') {
         if(!['pilot','live'].includes(mode||''))return json(req,{error:'請指定 mode=pilot 或 live。'},400);
         return json(req,{protocol:PROTOCOL,mode,...await studyServer(env).researchIndex(mode!)});
