@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <title>研究資料下載</title>
+  <link rel="stylesheet" href="./researcher.css?v=20261109">
+  <script type="module" src="./researcher.js?v=20261109"></script>
+</head>
+<body>
+<main>
+  <p class="eyebrow">A Lexicon Without Objects</p>
+  <h1>研究資料下載</h1>
+  <p id="service-status" class="note" role="status">正在讀取服務狀態…</p>
+  <section id="wrong-host" class="card" hidden>
+    <h2>請開啟研究後台網址</h2>
+    <p>管理密碼只應輸入到研究後端。請按以下連結前往：</p>
+    <a href="https://psyc-thesis-hk-staging-api.christine040805.workers.dev/researcher">開啟研究後台</a>
+  </section>
+  <section id="sign-in" class="card">
+    <h2>登入後台</h2>
+    <p>輸入你在 Cloudflare 設定的管理密碼。這不是 Cloudflare 帳戶密碼。</p>
+    <form id="login-form" method="post">
+      <label for="admin-token">管理密碼（ADMIN_TOKEN）</label>
+      <input id="admin-token" type="password" autocomplete="current-password" minlength="32" maxlength="1900" required disabled>
+      <button id="login" type="submit" disabled>登入</button>
+    </form>
+    <p class="help">密碼只保留在目前頁面記憶體，登出或離開頁面後會清除。</p>
+    <details id="setup">
+      <summary>第一次使用？設定管理密碼</summary>
+      <ol>
+        <li>按下面的「產生管理密碼」，再複製及儲存到你自己的密碼管理器。</li>
+        <li>在另一個分頁開啟 <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare</a>，選 <strong>Workers &amp; Pages → psyc-thesis-hk-staging-api → Settings</strong>。</li>
+        <li>找到 <strong>Variables and Secrets</strong>，編輯已有的 <strong>ADMIN_TOKEN</strong>，類型選 <strong>Secret</strong>，貼上剛才產生的密碼，再按儲存／Deploy。</li>
+        <li>返回本頁，把同一個密碼貼到上面的登入欄。</li>
+      </ol>
+      <p class="note">請只編輯 ADMIN_TOKEN。DRAW_SECRET 用於抽獎資格驗證，請保留原值。管理密碼請自行保存，不要貼到聊天或 GitHub。</p>
+      <button id="generate-key" class="secondary" type="button" disabled>產生管理密碼</button>
+      <div id="generated-wrap" hidden>
+        <label for="generated-key">新管理密碼</label>
+        <input id="generated-key" type="password" readonly autocomplete="off">
+        <label class="check"><input id="show-key" type="checkbox">顯示新密碼</label>
+        <button id="copy-key" class="secondary" type="button">複製新密碼</button>
+        <p id="copy-status" class="help" role="status"></p>
+      </div>
+    </details>
+  </section>
+  <section id="dashboard" class="card" hidden>
+    <div class="row"><h2>問卷及下載</h2><button id="logout" class="secondary" type="button">登出</button></div>
+    <label for="mode">資料類型</label>
+    <select id="mode"><option value="pilot">試測資料（pilot）</option><option value="live">正式研究資料（live）</option></select>
+    <dl class="counts"><div><dt>已提交問卷</dt><dd id="submitted">—</dd></div><div><dt>曾分配名額</dt><dd id="allocated">—</dd></div></dl>
+    <p class="help">已提交包括未通過注意力測試的問卷；曾分配名額包括過期或未完成的分配。</p>
+    <button id="refresh" class="secondary" type="button">更新數字</button>
+    <div class="downloads">
+      <button id="download-research" type="button">下載研究答案 CSV</button>
+      <button id="download-draw" class="secondary" type="button">下載抽獎電話 CSV</button>
+    </div>
+    <p id="download-status" role="status" class="help"></p>
+    <div id="download-links"></div>
+  </section>
+  <p id="error" class="error" role="alert" hidden></p>
+  <section class="card">
+    <h2>下載後怎樣使用</h2>
+    <ul>
+      <li>研究答案可用 Excel、SPSS 或 R 開啟；中文編碼為 UTF-8。</li>
+      <li>同一參加者會有多行。人數按不同的 <code>participant_code</code> 計算。</li>
+      <li><code>type=main</code> 是主要圖像試次；<code>attention</code> 是注意力試次。<code>valid_questionnaire</code> 是有效問卷標記。</li>
+      <li>空白評分代表該詞沒有被顯示作評分，保留為缺失值。</li>
+      <li>如見到「系統測試勿分析」，先找該行的 <code>participant_code</code>，再排除這個代碼的全部行。</li>
+      <li>抽獎檔案只有電話，請分開保管。試測與正式資料亦應分開分析。</li>
+    </ul>
+  </section>
+  <noscript><p>請啟用瀏覽器的 JavaScript 後使用資料下載頁。</p></noscript>
+</main>
+</body>
+</html>

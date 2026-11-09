@@ -6,7 +6,9 @@
 
 帳戶已建立並在 Cloudflare 選擇 GitHub 程式庫時，使用 [Cloudflare 畫面逐格設定](CLOUDFLARE_DASHBOARD_SETUP.md) 部署隔離試測網站。另有 [GitHub Actions 安全設定指引](CLOUDFLARE_GITHUB_SETUP.md)。兩者均不切換正式 API。
 
-目前程式已準備獨立 Cloudflare Workers 後端，但**未部署、未遷移正式資料、未完成香港無 VPN 實測，正式入口未切換**。不能將本機測試或海外雲端成功連線當成香港驗收結果。
+隔離試測後端已部署至 `psyc-thesis-hk-staging-api.christine040805.workers.dev`。2026年11月9日使用者確認 iPad Safari 無 VPN 試測成功；三種瀏覽器引擎及四種畫面尺寸的完整作答／儲存測試亦已通過。管理者的研究 CSV 下載與核對見 [DOWNLOAD_DATA.md](DOWNLOAD_DATA.md)。**原 GitHub Pages 的正式 API 仍未切換，現有新服務只收試測資料。**
+
+使用者已確認舊網站只有自己試測，沒有需要遷移的正式答案或抽獎電話。舊服務與試測資料保留；正式服務可使用全新、獨立的兩個 D1。Workers Builds 會以 CI 的名稱與身分標記鎖定所連接的 Worker，因此正式服務須另建一個對應的 Workers Builds 專案，不可移除身分檢查，或從現有試測建置直接改名部署。正式切換仍須核對實際正式網址、健康狀態及 GitHub 來源連線。
 
 ## 1. 先建立你的 Cloudflare 帳戶
 

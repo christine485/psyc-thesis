@@ -12,6 +12,7 @@ export const mode=(x:unknown)=>x==='pilot'?'pilot':'live';
 export const storageMode=(x:unknown)=>mode(x)+':'+PROTOCOL;
 export async function hash(value:string){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function token(value:unknown){if(typeof value!=='string'||! /^[a-f0-9-]{36}$/.test(value))throw Error('參與代碼不正確。');return value;}
+const RESEARCH_COLUMNS=['participant_code','protocol','valid_questionnaire','slot','trial','type','stimulus','condition','waviness_deg','disorder_sd_deg','grain_sigma_px','seed','free_text','named_words','classified_words','classifier_version','unmatched_words','rated_word','word_family','word_order','rating','attention_pass','naming_ms','duration_ms','display_width','display_height','gender','age','education','device','viewport_width','viewport_height'];
 
 // Both hosting adapters use exactly the same protocol, storage and draw logic.
 export function createStudyServer(bindings:()=>StudyBindings){
@@ -60,13 +61,24 @@ async function enterDraw(body:any){
  await bucket.put(m+'/phones/'+phoneHash+'.json',JSON.stringify({phone}),{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/json'}});
  return {submitted:true};
 }
-async function records(m:string){const result=await bindings().DB.prepare('SELECT id,payload FROM slots WHERE mode=? AND submitted=1 ORDER BY id').bind(storageMode(m)).all();return result.results.map((r:any)=>JSON.parse(r.payload));}
-async function researchCSV(m:string){
- const rows:any[][]=[['participant_code','protocol','valid_questionnaire','slot','trial','type','stimulus','condition','waviness_deg','disorder_sd_deg','grain_sigma_px','seed','free_text','named_words','classified_words','classifier_version','unmatched_words','rated_word','word_family','word_order','rating','attention_pass','naming_ms','duration_ms','display_width','display_height','gender','age','education','device','viewport_width','viewport_height']];
- for(const p of await records(m))for(const r of p.responses){const s=STIMULI.find((s:any)=>s.file===r.stimulus)!;for(const w of r.words.length?r.words:[''])rows.push([p.participantCode,p.protocol,p.validQuestionnaire,p.plan.slot,r.index+1,r.type,s.file,s.condition,s.waviness_deg,s.disorder_sd_deg,s.grain_sigma_px,s.seed,r.freeText,JSON.stringify(r.named),JSON.stringify(r.classified),p.classifier,r.classified.filter((x:any)=>!x.family).map((x:any)=>x.raw).join('、'),w,FAMILIES.find((f:any)=>f.selected.includes(w))?.id||'',w?r.words.indexOf(w)+1:'',w?r.ratings[w]:'',r.attentionPass,r.namingMs,r.durationMs,r.width,r.height,p.demographics.gender,p.demographics.age,p.demographics.education,p.device.kind,p.device.viewportWidth,p.device.viewportHeight]);}
+async function records(m:string,slot?:number){
+ const query=slot===undefined
+  ?bindings().DB.prepare('SELECT id,payload FROM slots WHERE mode=? AND submitted=1 ORDER BY id').bind(storageMode(m))
+  :bindings().DB.prepare('SELECT id,payload FROM slots WHERE mode=? AND id=? AND submitted=1 ORDER BY id').bind(storageMode(m),slot);
+ const result=await query.all();return result.results.map((r:any)=>JSON.parse(r.payload));
+}
+async function researchIndex(m:string){
+ // Submitted payloads are immutable. Capture IDs once, then export one payload
+ // per request so creating a large CSV does not monopolize a Free Worker.
+ const result=await bindings().DB.prepare('SELECT id FROM slots WHERE mode=? AND submitted=1 ORDER BY id').bind(storageMode(m)).all();
+ return {slots:result.results.map((row:any)=>row.id),header:csv([RESEARCH_COLUMNS])};
+}
+async function researchCSV(m:string,slot?:number){
+ const rows:any[][]=[RESEARCH_COLUMNS];
+ for(const p of await records(m,slot))for(const r of p.responses){const s=STIMULI.find((s:any)=>s.file===r.stimulus)!;for(const w of r.words.length?r.words:[''])rows.push([p.participantCode,p.protocol,p.validQuestionnaire,p.plan.slot,r.index+1,r.type,s.file,s.condition,s.waviness_deg,s.disorder_sd_deg,s.grain_sigma_px,s.seed,r.freeText,JSON.stringify(r.named),JSON.stringify(r.classified),p.classifier,r.classified.filter((x:any)=>!x.family).map((x:any)=>x.raw).join('、'),w,FAMILIES.find((f:any)=>f.selected.includes(w))?.id||'',w?r.words.indexOf(w)+1:'',w?r.ratings[w]:'',r.attentionPass,r.namingMs,r.durationMs,r.width,r.height,p.demographics.gender,p.demographics.age,p.demographics.education,p.device.kind,p.device.viewportWidth,p.device.viewportHeight]);}
  return csv(rows);
 }
 async function drawCSV(m:string){const rows:any[][]=[['phone']];let cursor:string|undefined;do{const list=await bindings().BUCKET.list({prefix:m+'/phones/',cursor});for(const item of list.objects){const value:any=await(await bindings().BUCKET.get(item.key))?.json();if(value)rows.push([value.phone]);}cursor=list.truncated?list.cursor:undefined;}while(cursor);return csv(rows);}
 
-return {allocate,submit,enterDraw,records,researchCSV,drawCSV,signPermit,CLAIM_SQL};
+return {allocate,submit,enterDraw,records,researchIndex,researchCSV,drawCSV,signPermit,CLAIM_SQL};
 }

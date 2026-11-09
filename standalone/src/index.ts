@@ -1,6 +1,6 @@
 import {createStudyServer} from '../../lib/study-core.ts';
 import {PROTOCOL, STIMULI} from '../../docs/modules/protocol.mjs';
-import {createContactStore} from './contact-store.ts';
+import {createContactStore,exportDrawCSV} from './contact-store.ts';
 
 export interface Env {
   DB: D1Database;
@@ -53,7 +53,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
     const ready=configurationReady&&storageReady&&env.STUDY_MAINTENANCE!=='1';
     return json(req,{ok:ready,protocol:PROTOCOL,images:STIMULI.length,configurationReady,storageReady,maintenance:env.STUDY_MAINTENANCE==='1',stagingOnly:env.STAGING_ONLY==='1'},ready?200:503);
   }
-  if(path==='/api/admin/export'||path==='/api/admin/status') {
+  if(path==='/api/admin/export'||path==='/api/admin/status'||path==='/api/admin/export-index') {
     if(req.method!=='GET')return json(req,{error:'Method not allowed'},405);
     if(!adminOriginAllowed(req,url)||!await authorized(req,env))return json(req,{error:'僅研究團隊可下載。'},403);
     if(!configured(env))return json(req,{error:'研究服務尚未準備好。'},503);
@@ -67,8 +67,18 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
         return json(req,{protocol:PROTOCOL,maintenance:env.STUDY_MAINTENANCE==='1',modes});
       }
       const mode=url.searchParams.get('mode'),kind=url.searchParams.get('kind');
+      if(path==='/api/admin/export-index') {
+        if(!['pilot','live'].includes(mode||''))return json(req,{error:'請指定 mode=pilot 或 live。'},400);
+        return json(req,{protocol:PROTOCOL,mode,...await studyServer(env).researchIndex(mode!)});
+      }
       if(!['pilot','live'].includes(mode||'')||!['research','draw'].includes(kind||''))return json(req,{error:'請指定 mode=pilot 或 live，以及 kind=research 或 draw。'},400);
-      const study=studyServer(env);const data=await(kind==='draw'?study.drawCSV(mode!):study.researchCSV(mode!));
+      let slot:number|undefined;
+      if(url.searchParams.has('slot')) {
+        const value=url.searchParams.get('slot')!;
+        if(kind!=='research'||url.searchParams.getAll('slot').length!==1||!/^(0|[1-9]\d*)$/.test(value)||!Number.isSafeInteger(Number(value)))return json(req,{error:'問卷名額不正確。'},400);
+        slot=Number(value);
+      }
+      const data=await(kind==='draw'?exportDrawCSV(env.CONTACTS_DB,mode!):studyServer(env).researchCSV(mode!,slot));
       return new Response(data,{headers:{...safeHeaders,'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${mode}-${kind}.csv"`}});
     }catch{return json(req,{error:'暫時無法讀取研究資料。'},503);}
   }
