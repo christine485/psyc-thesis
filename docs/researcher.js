@@ -49,7 +49,7 @@ async function exportCSV(kind){
 if(!allowed){$('sign-in').hidden=true;$('wrong-host').hidden=false;$('service-status').textContent='請使用研究後端的管理頁。';}
 else{
  $('admin-token').disabled=false;$('login').disabled=false;$('generate-key').disabled=false;
- api('/api/health','json','').then(health=>{$('mode').value=health.stagingOnly?'pilot':'live';$('service-status').textContent=health.stagingOnly?'此服務目前只收集試測資料（pilot）。正式研究尚未啟用。':'此服務已啟用正式研究。請確認選取所需資料類型。';}).catch(()=>{$('service-status').textContent='服務狀態暫時未能讀取；你仍可嘗試登入。';});
+ api('/api/health','json','').then(health=>{if(!token)$('mode').value=health.stagingOnly?'pilot':'live';$('service-status').textContent=health.stagingOnly?'此服務目前只收集試測資料（pilot）。正式研究尚未啟用。':'此服務已啟用正式研究。請確認選取所需資料類型。';}).catch(()=>{$('service-status').textContent='服務狀態暫時未能讀取；你仍可嘗試登入。';});
  $('login-form').addEventListener('submit',async event=>{
   event.preventDefault();const candidate=$('admin-token').value.trim();if(candidate.length<32||candidate.length>1900)return;
   const current=generation;token=candidate;$('admin-token').value='';$('login').disabled=true;$('admin-token').disabled=true;error();
