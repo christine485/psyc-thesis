@@ -99,6 +99,8 @@ try{
     if(request.headers().authorization)credentialRequests.push(request.url());
     if(request.method()==='OPTIONS')preflights++;
     const response=await fetchHandler(new Request(request.url(),{method:request.method(),headers:request.headers()}),{...env,STAGING_ONLY:'0'});
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'),githubOrigin,'Every API response, including CSV, must allow the website origin');
+    assert.equal(response.headers.get('Access-Control-Allow-Credentials'),null);
     await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())});return;
    }
    assert.equal(url.origin,githubOrigin,'Frontend assets must remain on the website');
