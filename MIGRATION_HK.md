@@ -6,7 +6,9 @@
 
 帳戶已建立並在 Cloudflare 選擇 GitHub 程式庫時，使用 [Cloudflare 畫面逐格設定](CLOUDFLARE_DASHBOARD_SETUP.md) 部署隔離試測網站。另有 [GitHub Actions 安全設定指引](CLOUDFLARE_GITHUB_SETUP.md)。兩者均不切換正式 API。
 
-隔離試測後端已部署至 `psyc-thesis-hk-staging-api.christine040805.workers.dev`。2026年11月9日使用者確認 iPad Safari 無 VPN 試測成功；三種瀏覽器引擎及四種畫面尺寸的完整作答／儲存測試亦已通過。管理者的研究 CSV 下載與核對見 [DOWNLOAD_DATA.md](DOWNLOAD_DATA.md)。**原 GitHub Pages 的正式 API 仍未切換，現有新服務只收試測資料。**
+正式後端已部署並通過公開健康、版本、兩個資料庫及 GitHub 來源連線核對：`https://psyc-thesis-api.christine040805.workers.dev`。本次前端切換將原 GitHub Pages 參加者入口及同網站研究後台接駁至這個正式服務；最終原網址的香港無 VPN 完整試測與管理者下載核對仍須完成。CSV 下載與管理密碼設定見 [DOWNLOAD_DATA.md](DOWNLOAD_DATA.md)。
+
+原隔離試測後端 `psyc-thesis-hk-staging-api.christine040805.workers.dev` 及其資料庫保留。2026年11月9日使用者已確認該試測版本在 iPad Safari 無 VPN 完成；三種瀏覽器引擎及四種畫面尺寸的完整作答／儲存測試亦已通過。這不等於已完成正式網址的香港驗收。
 
 使用者已確認舊網站只有自己試測，沒有需要遷移的正式答案或抽獎電話。舊服務與試測資料保留；正式服務可使用全新、獨立的兩個 D1。Workers Builds 會以 CI 的名稱與身分標記鎖定所連接的 Worker，因此正式服務須另建一個對應的 Workers Builds 專案，不可移除身分檢查，或從現有試測建置直接改名部署。正式切換仍須核對實際正式網址、健康狀態及 GitHub 來源連線。
 

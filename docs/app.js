@@ -2,7 +2,7 @@ import {PROTOCOL,CONSENT,TOTAL,SCALE,EDUCATION,parseWords,ratingWords,normalizeP
 import {watchStimulus} from './modules/image-loader.mjs?v=hk-speed-20261109';
 import {createStimulusPool} from './modules/image-preload.mjs?v=hk-speed-20261109';
 import {postStudy} from './modules/study-request.mjs?v=hk-speed-20261109';
-import {API_BASE,STIMULUS_BASE} from './config.js?v=hk-backend-20261106';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
+import {API_BASE,STIMULUS_BASE} from './config.js?v=backend-1794280473961';import {TITLE,CONFIRM,contacts,CONSENT_HTML,DEBRIEF_HTML} from './forms.js?v=hk-formal-20261104';
 const root=document.querySelector('#app'),query=new URLSearchParams(location.search);
 const stimulusURL=file=>STIMULUS_BASE+file;
 const mode=query.get('mode')==='pilot'?'pilot':'live',preview=query.get('preview')==='1';

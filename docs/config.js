@@ -1,3 +1,3 @@
-export const API_BASE=location.hostname.endsWith('.chatgpt.site')?location.origin:'https://cloud-flow-emotion-study.christine040805.chatgpt.site';
-// Keep stimuli on the same static host as the experiment, independent of the API.
+// Independent backend. Secrets must never be added to this file.
+export const API_BASE="https://psyc-thesis-api.christine040805.workers.dev";
 export const STIMULUS_BASE=new URL('./stimuli/',import.meta.url).href;

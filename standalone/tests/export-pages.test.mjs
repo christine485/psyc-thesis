@@ -113,6 +113,10 @@ test('the index and individual exports require authorization, trusted origins an
   }
   assert.equal(reads,0,'Denied exports must never read the research database');
   assert.equal((await f.api('/api/admin/export-index?mode=pilot',{Origin:'https://christine485.github.io'})).status,200);
+  for(const kind of ['research','draw']){
+   const exported=await f.api('/api/admin/export?mode=pilot&kind='+kind,{Origin:'https://christine485.github.io'});
+   assert.equal(exported.status,200);assert.equal(exported.headers.get('Access-Control-Allow-Origin'),'https://christine485.github.io');assert.equal(exported.headers.get('Access-Control-Allow-Credentials'),null);assert.equal(exported.headers.get('Cache-Control'),'no-store');
+  }
   assert.equal((await f.api('/api/admin/export-index?mode=pilot',{Origin:origin})).status,200);
   for(const route of ['/api/admin/export-index','/api/admin/export-index?mode=typo','/api/admin/export?mode=pilot&kind=draw&slot=0','/api/admin/export?mode=pilot&kind=research&slot=0&slot=1'])assert.equal((await f.api(route)).status,400);
   for(const slot of ['', '-1','-0','01','1.5','1e2','Infinity','NaN','9007199254740992','0%20OR%201=1'])assert.equal((await f.api('/api/admin/export?mode=pilot&kind=research&slot='+slot)).status,400);

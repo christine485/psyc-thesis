@@ -1,4 +1,4 @@
-import {API_BASE} from './config.js?v=formal-20261109';
+import {API_BASE} from './config.js?v=backend-1794280473961';
 const $=id=>document.getElementById(id);
 const formalOrigin='https://psyc-thesis-api.christine040805.workers.dev';
 const workerOrigins=new Set([formalOrigin,'https://psyc-thesis-hk-staging-api.christine040805.workers.dev']);

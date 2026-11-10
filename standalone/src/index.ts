@@ -90,7 +90,7 @@ export async function fetchHandler(req:Request,env:Env):Promise<Response> {
         slot=Number(value);
       }
       const data=await(kind==='draw'?exportDrawCSV(env.CONTACTS_DB,mode!):studyServer(env).researchCSV(mode!,slot));
-      return new Response(data,{headers:{...safeHeaders,'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${mode}-${kind}.csv"`}});
+      return new Response(data,{headers:{...headers(req),'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${mode}-${kind}.csv"`}});
     }catch{return json(req,{error:'暫時無法讀取研究資料。'},503);}
   }
   if(!participantPaths.has(path))return json(req,{error:'Not found'},404);

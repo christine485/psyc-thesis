@@ -16,6 +16,9 @@ async function fixture(){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'psyc-cutover-test-'));
  await fs.mkdir(path.join(root,'docs'));
  await Promise.all(FILES.map(file=>fs.copyFile(path.join(ROOT,file),path.join(root,file))));
+ // Exercise the original migration even after the repository already points
+ // at the formal service. This fixture never modifies the actual frontend.
+ await fs.writeFile(path.join(root,'docs/config.js'),"export const API_BASE='https://previous-api.example.test';\nexport const STIMULUS_BASE=new URL('./stimuli/',import.meta.url).href;\n");
  await fs.cp(path.join(ROOT,'docs/stimuli'),path.join(root,'docs/stimuli'),{recursive:true});
  return {root,snapshot:async()=>Object.fromEntries(await Promise.all(FILES.map(async file=>[file,await fs.readFile(path.join(root,file),'utf8')]))),close:()=>fs.rm(root,{recursive:true,force:true})};
 }
@@ -65,6 +68,7 @@ test('cutover updates exactly five files and refreshes participant and researche
   assert.equal(after['docs/index.html'],before['docs/index.html'].replace(/src=(["'])\.\/app\.js(?:\?[^"']*)?\1/,'src="./app.js?v='+version+'"'));
   assert.equal(after['docs/researcher.html'],before['docs/researcher.html'].replace(/src=(["'])\.\/researcher\.js(?:\?[^"']*)?\1/,'src="./researcher.js?v='+version+'"'));
   for(const image of STIMULI)assert.equal(createHash('sha256').update(await fs.readFile(path.join(f.root,'docs/stimuli',image.file))).digest('hex'),image.sha256);
+  const repeated=await prepareBackendCutover({apiBase:ORIGIN,root:f.root,fetchImpl:h.fetchImpl,version});assert.deepEqual(repeated.changes,[]);assert.deepEqual(await f.snapshot(),after);
  }finally{await f.close();}
 });
 test('missing or duplicate source templates stop before any frontend file is written',async()=>{

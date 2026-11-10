@@ -1,5 +1,5 @@
 # 研究操作說明
-正式項目建立與原網站後台接駁見 [CLOUDFLARE_FORMAL_SETUP.md](CLOUDFLARE_FORMAL_SETUP.md)。正式服務通過實際網址核對後，原網站頁尾「研究團隊登入」會提供同網站的受保護資料頁；此前維持現有試測後台。
+正式項目與原網站後台接駁見 [CLOUDFLARE_FORMAL_SETUP.md](CLOUDFLARE_FORMAL_SETUP.md)。正式服務已通過公開健康及 GitHub 來源連線核對；本次切換後，原網站頁尾「研究團隊登入」提供同網站的受保護資料頁。原試測後台及資料另行保留。
 
 研究版本：cloud-flow-naming-fit-v3-hk20261104；分類版本：tc-lexicon-conservative-v1；同意書版本：cloud-flow-consent-20261104-v2-hk。
 
@@ -31,7 +31,7 @@
 平台供應商仍可能處理網絡及服務紀錄，不承諾基礎設施層面的絕對不可關聯。
 
 ## 資料與研究人員頁
-獨立後端的研究下載頁為 [研究資料下載](https://psyc-thesis-hk-staging-api.christine040805.workers.dev/researcher)，初次私下設定管理密碼、下載 CSV 及分析欄位說明見 [DOWNLOAD_DATA.md](DOWNLOAD_DATA.md)。目前服務仍只供試測。使用該頁時，研究答案按已提交名額的固定清單逐份讀取後合併為一個 CSV，降低免費 Worker 每次處理負擔；抽獎電話以專用 D1 的單一索引查詢匯出。既有 CSV 欄位、排序、UTF-8 BOM 及公式轉義保留。
+正式研究下載頁為 [研究資料下載](https://christine485.github.io/psyc-thesis/researcher.html)，初次私下設定正式 Worker 的管理密碼、下載 CSV 及分析欄位說明見 [DOWNLOAD_DATA.md](DOWNLOAD_DATA.md)。使用該頁時，研究答案按已提交名額的固定清單逐份讀取後合併為一個 CSV，降低免費 Worker 每次處理負擔；抽獎電話以專用 D1 的單一索引查詢匯出。既有 CSV 欄位、排序、UTF-8 BOM 及公式轉義保留。
 
 研究答案在最後提交前只在當前頁面記憶體，重新整理／關閉會丟失。伺服器只先保留圖片分配資料。提交採冪等處理，重試不會重複研究紀錄。
 原 Sites 服務的 D1 研究資料與 R2 抽獎聯絡資料分開；原服務及歷史資料維持原樣。新獨立版本以兩個不同的 D1 資料庫維持分離：`DB` 儲存研究答案，`CONTACTS_DB` 只儲存抽獎聯絡資料，不使用 R2。兩個資料庫不可綁定至相同 ID。試測／正式命名空間分開；未經授權不可下載。原 Sites 研究人員需以擁有者帳戶登入 /researcher；獨立版本改用管理秘密值授權。研究 CSV 為每個試次×評分詞一列；零項配合評分的試次仍輸出一列，保留自由命名。注意力 type=attention 應與 type=main 分開。
